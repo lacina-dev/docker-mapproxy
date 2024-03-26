@@ -1,184 +1,69 @@
-# #####################################################################
-#                 MapProxy example configuration
-# #####################################################################
-#
-# This is _not_ a runnable configuration, but it contains most
-# available options in meaningful combinations.
-#
-# Use this file in addition to the documentation to see where and how
-# things can be configured.
-
-
 services:
+  #sets up how to make the source data available
   demo:
-  wms:
-    # only offer WMS 1.1.1
-    versions: ['1.1.1', '1.3.0']
-    # supported SRS for this WMS
-    srs: ['EPSG:4326', 'EPSG:3857']
-    # force the layer extents (BBOX) to be displayed in this SRS
-    bbox_srs: ['EPSG:4326']
-    # limit the supported image formats.
-    image_formats: ['image/jpeg', 'image/png', 'image/gif', 'image/GeoTIFF', 'image/tiff']
-    # return an OGC service exception when one or more sources return errors
-    # or no response at all (e.g. timeout)
-    on_source_errors: raise
-
-    # some WMS clients do not send all required parameters in feature info
-    # requests, MapProxy ignores these errors unless you set strict to true.
-    strict: true
-
-    # list of feature info types the server should offer
-    featureinfo_types: ['text', 'html', 'xml']
-
-    md:
-      # metadata used in capabilities documents
-      title: Mapproxy demo map
-      abstract: The map showing how QGIS Server interacts with Mapproxy.
-      online_resource: http://kartoza.com/
-      contact:
-        person: Kartoza
-        position: GIS Manager
-        organization:
-        address:
-        city:
-        postcode:
-        country: south Africa
-        phone:
-        email:
-      access_constraints:
-        Insert license and copyright information for this service.
-      fees: 'None'
   tms:
     use_grid_names: true
-  wmts:
-    restful: true
-    restful_template: '/{Layer}/{TileMatrixSet}/{TileMatrix}/{TileCol}/{TileRow}.{Format}'
-    kvp: true
-  kml:
-    use_grid_names: true
+    # origin for /tiles service
+    origin: 'nw'
+  wms:
+    #srs sets the coordinate reference systems as which you want to make your data available. MapProxy reprojects the source data very well to these projections.
+    srs: ['EPSG:3857']
+    image_formats: ['image/png']
+    md:
+      # metadata used in capabilities documents
+      title: Mapproxy OSM cache
+      abstract: This is the MapProxy
+      fees: 'None'
+
 
 layers:
-  - name: Hillshade
-    title: Hillshade
-    sources: [hillshade_cache]
-
-
-  - name: SRTM
-    title: SRTM 30m
-    sources: [srtm_cache]
-
-  - name: airports
-    title: Airports
-    sources: [airports_cache]
-
+  #sets up which layers you want to make available using the services above. You can add many, but let's stick to osm data here.
+  - name: osm_demo      # access in JOSM as TMS: http://localhost:8080/tiles/1.0.0/osm_demo/webmercator/{zoom}/{x}/{y}.png
+    title: Open Streetmap Tiles (test)
+    sources: [osm_cache]
+  - name: gm_layer
+    title: Test of using GM tiles
+    sources: [ gm_cache ]
 
 
 caches:
-  
-  airports_cache:
-    sources: [airports_wms]
-    grids: [osm_grid]
-    meta_size: [5,5]
-    meta_buffer: 20
-    concurrent_tile_creators: 2
-    cache:
-      type: mbtiles
-      filename: /cache_data/airports.mbtiles
-
-
-
-  srtm_cache:
-    sources: [srtm_wms]
-    grids: [osm_grid]
-    meta_size: [5,5]
-    meta_buffer: 20
-    concurrent_tile_creators: 2
+  #setup the cache for the open streetmap tiles. This cache is used by the layer above.
+  osm_cache:
+    sources: [osm_tiles]
+    format: image/png
+    grids: [webmercator]
+  gm_cache:
+    grids: [ gm_grid ]
+    sources: [ gm ]
     cache:
       type: file
-      directory: /cache_data/srtm_cache
-    format: custom_format
+      directory_layout: tms
 
-  hillshade_cache:
-    sources: [hillshade_wms]
-    grids: [osm_grid]
-    meta_size: [5,5]
-    meta_buffer: 20
-    concurrent_tile_creators: 2
-    cache:
-      type: mbtiles
-      filename: /cache_data/hillshade.mbtiles
 
 sources:
-  hillshade_wms:
-    coverage:
+  osm_tiles:
+    #the osm_tiles source refers to the openstreetmap.org tiles. These will be downloaded upon request (if not already cached) and served by MapProxy
+    type: tile
+    url: http://tile.openstreetmap.org/%(tms_path)s.%(format)s
+    grid: webmercator
+  gm:
+    type: tile
+    url: http://mt0.google.com/vt/lyrs=s@0&hl=en&x=%(x)s&y=%(y)s&z=%(z)s
+    grid: gm_grid
 
-      bbox: [20, -9.99999999998001, 59.999999999984, 40]
-      bbox_srs: EPSG:4326
-    type: wms
-    image:
-      transparent_color: '#ffffff'
-      transparent_color_tolerance: 20
-    wms_opts:
-      version: 1.3.0
-      featureinfo: True
-    req:
-      url: http://map:8080/ows/?map=project.qgs
-      layers: Hillshade
-      transparent: true
-    supported_formats: [png]
-    supported_srs: ['EPSG:3857', 'CRS:84']
-
-
-  srtm_wms:
-    coverage:
-      bbox: [20, -9.99999999998001, 59.999999999984, 40]
-      bbox_srs: EPSG:4326
-    type: wms
-    image:
-      transparent_color: '#ffffff'
-      transparent_color_tolerance: 20
-    wms_opts:
-      version: 1.3.0
-      featureinfo: True
-    req:
-      url: http://map:8080/ows/?map=project.qgs
-      layers: SRTM
-      transparent: true
-    supported_formats: [png]
-    supported_srs: ['EPSG:3857', 'CRS:84']
-
-
-  airports_wms:
-    coverage:
-      bbox: [20, -9.99999999998001, 59.999999999984, 40]
-      bbox_srs: EPSG:4326
-    type: wms
-    image:
-      transparent_color: '#ffffff'
-      transparent_color_tolerance: 20
-    wms_opts:
-      version: 1.3.0
-      featureinfo: True
-    req:
-      url: http://map:8080/ows/?map=project.qgs
-      layers: Airports
-      transparent: true
-    supported_formats: [png]
-    supported_srs: ['EPSG:3857', 'CRS:84']
 
 grids:
-  osm_grid:
+  webmercator:
+    base: GLOBAL_WEBMERCATOR
+  gm_grid:
     base: GLOBAL_MERCATOR
-    srs: 'EPSG:3857'
-    origin: nw 
+    origin: ul
+
 
 globals:
+  #next are some global configuration options for MapProxy. They mostly explain themselves, or can be looked-up in the MapProxy docs.
   cache:
-    meta_size: [6, 6]
-    meta_buffer: 20
-    lock_dir: '/cache_data/locks'
-    # where to store lockfiles for tile creation
-    tile_lock_dir: '/cache_data/tile_locks'
-  http:
-    ssl_no_cert_checks: true
+    # where to store the cached images
+    base_dir: './cache_data'
+    # where to store lockfiles
+    lock_dir: './cache_data/locks'
