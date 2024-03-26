@@ -14,11 +14,11 @@ services:
           IMAGE_VERSION: '3.11.5'
       volumes:
         # If MULTI_MAPPROXY=true then mount to /multi_mapproxy otherwise mount to /mapproxy
-        - ./mapproxy_configuration:/multi_mapproxy
+        - ./mapproxy_configuration:/mapproxy
         - mapproxy_cache_data:/cache_data
       ports:
-        - "8080:8080"
-      restart: on-failure
+        - "8082:8080"
+      restart: always
       environment:
         - PRODUCTION=true
         - PROCESSES=20
@@ -26,7 +26,7 @@ services:
         - THREADS=10
         - MAPPROXY_USER_ID=1000
         - MAPPROXY_GROUP_ID=1000
-        - MULTI_MAPPROXY=true
+        - MULTI_MAPPROXY=false
         - ALLOW_LISTING=True
         - LOGGING=true
 
