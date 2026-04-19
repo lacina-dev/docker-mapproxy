@@ -1,14 +1,16 @@
 services:
   #sets up how to make the source data available
   demo:
+  kml:
+  wmts:
   tms:
     use_grid_names: true
     # origin for /tiles service
     origin: 'nw'
   wms:
     #srs sets the coordinate reference systems as which you want to make your data available. MapProxy reprojects the source data very well to these projections.
-    srs: ['EPSG:3857']
-    image_formats: ['image/png']
+#    srs: ['EPSG:3857']
+#    image_formats: ['image/png']
     md:
       # metadata used in capabilities documents
       title: Mapproxy OSM cache
@@ -58,6 +60,7 @@ grids:
   gm_grid:
     base: GLOBAL_MERCATOR
     origin: ul
+
 
 
 globals:
