@@ -26,6 +26,9 @@ layers:
   - name: gm_layer
     title: Test of using GM tiles
     sources: [ gm_cache ]
+  - name: cuzk_layer
+    title: CUZK ortofoto CR (12.5 cm, free WMS, no key)
+    sources: [ cuzk_cache ]
 
 
 caches:
@@ -37,6 +40,13 @@ caches:
   gm_cache:
     grids: [ gm_grid ]
     sources: [ gm ]
+    cache:
+      type: file
+      directory_layout: tms
+  cuzk_cache:
+    grids: [ gm_grid ]
+    sources: [ cuzk ]
+    format: image/png
     cache:
       type: file
       directory_layout: tms
@@ -52,6 +62,16 @@ sources:
     type: tile
     url: http://mt0.google.com/vt/lyrs=s@0&hl=en&x=%(x)s&y=%(y)s&z=%(z)s
     grid: gm_grid
+  cuzk:
+    # CUZK ortofoto CR — official Czech orthophoto, ~12.5 cm, refreshed on a
+    # 2-year cycle, free WMS without an API key. Verified 2026-08-01: serves
+    # EPSG:3857 directly (no reprojection needed).
+    type: wms
+    supported_srs: ['EPSG:3857']
+    req:
+      url: https://ags.cuzk.cz/arcgis1/services/ORTOFOTO/MapServer/WMSServer
+      layers: 0
+      transparent: false
 
 
 grids:
@@ -60,6 +80,9 @@ grids:
   gm_grid:
     base: GLOBAL_MERCATOR
     origin: ul
+    # 22 levels = max z21 (~7.5 cm/px at lat 50): lets the CUZK 12.5 cm
+    # ortofoto and Google z20 through; existing z0-19 cache tiles stay valid
+    num_levels: 22
 
 
 
@@ -70,3 +93,7 @@ globals:
     base_dir: './cache_data'
     # where to store lockfiles
     lock_dir: './cache_data/locks'
+  # browser-side tile expiry: 1 hour instead of the 72h default (ETag keeps
+  # revalidation cheap; 72h made stale tiles stick in the browser cache)
+  tiles:
+    expires_hours: 1
