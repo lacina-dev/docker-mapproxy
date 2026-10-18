@@ -9,3 +9,7 @@ minio_data/**
 !minio_data/.gitkeep
 .idea*
 web/index.html
+*.bak_*
+*_bak_*
+*.orig
+.claude/
