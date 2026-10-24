@@ -129,13 +129,13 @@ if [ "$1" = '/scripts/run_develop_server.sh' ] || [ "$1" = '/scripts/start.sh' ]
     fi
 
     # Add logic to reload the app file useful in single mode only. Multi mapproxy auto reloads
-
-    RELOAD_LOCKFILE="/settings/.app.lock"
-    if [[ ! -f ${RELOAD_LOCKFILE} ]];then
-      sed -i 's/\(, reloader=True\)*'\)'/, reloader=True\)/g' "${MAPPROXY_APP_DIR}"/app.py
-      touch ${RELOAD_LOCKFILE}
+    # app.py is regenerated above on EVERY start, so the reloader is added on every start
+    # too (a one-time lockfile left later starts without it: a changed mapproxy.yaml was
+    # never picked up until the container was recreated).
+    if ! grep -q 'reloader=True' "${MAPPROXY_APP_DIR}"/app.py; then
+      sed -i '/^application = make_wsgi_app(/ s/)[[:space:]]*$/, reloader=True)/' "${MAPPROXY_APP_DIR}"/app.py
     fi
-    
+
 
     # Entrypoint logic to start the app
     if [[ ${PRODUCTION} =~ [Tt][Rr][Uu][Ee] ]] && [[ ${MULTI_MAPPROXY} =~ [Ff][Aa][Ll][Ss][Ee] ]]; then

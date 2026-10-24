@@ -16,6 +16,9 @@ services:
         # If MULTI_MAPPROXY=true then mount to /multi_mapproxy otherwise mount to /mapproxy
         - ./mapproxy_configuration:/mapproxy
         - mapproxy_cache_data:/cache_data
+        # the entrypoint from this repo, not the copy baked into the image: its fixes
+        # (reloader on every start) apply on `up -d` without rebuilding the image
+        - ./scripts/start.sh:/scripts/start.sh:ro
       ports:
         - "8082:8080"
       restart: always
