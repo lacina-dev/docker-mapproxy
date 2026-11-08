@@ -283,6 +283,28 @@ mounted from this repo and starts MapProxy with `reloader=True`, so a saved
   CENIA 2010 a © GEODIS BRNO, spol. s r.o. 2010, podkladové letecké snímky
   poskytl VGHMÚř Dobruška, © MO ČR 2009" — shortened in the UI credit
   (`ui_sources.json`).
+* **Precipitation mosaic (`precip_mosaic`, catalog id `precip`).** The newest
+  frame (`latest`) of the robot's own precipitation mosaic service
+  `vitulus_precip` (repo precip-mosaic, its own container on the host
+  network from `deploy/docker-compose.yml`, HTTP port **8097** on all
+  interfaces; procedure in its README, *Deployment on the robot*). Transparent PNG, nothing stored
+  (`disable_storage`: the frame changes every 5 min); the service draws
+  z3–z8 around the site, z9–z21 are upscaled from its z8 tile. This
+  container runs on the compose bridge network, so the source URL uses
+  `host.docker.internal`, mapped to the host by `extra_hosts:
+  host-gateway` in `docker-compose-build.yml` — the container must be
+  **recreated** once after that change (`docker compose -f
+  docker-compose-build.yml up -d --no-build mapproxy`). Until then, and
+  whenever the service is down or hangs (15 s timeout), the layer answers a
+  transparent tile (HTTP 200, not stored) and the other layers are not
+  affected. MapProxy sends these tiles with the global max-age 1 h, so a
+  browser keeps a stale frame unless the client adds a changing query
+  parameter (MapProxy ignores it). The robot UI uses this layer only as a
+  fallback: with the catalog's `"timeline": {"port": 8097}` it takes the
+  frames from the service itself, each with its own URL. Credit: © EUMETNET OPERA (CC BY 4.0),
+  © ČHMÚ, Weather data by RainViewer; RainViewer data are for personal use
+  only (not redistributable): keep this endpoint private. The time slider of
+  the UI talks to the service directly.
 * **Terms.** ČÚZK layers and the CENIA 1950s orthophoto are open data (CC BY
   4.0). Google, Esri (also
   the Esri Wayback releases `esri_wb_*`) and Bing tiles are used without an API key and cached against their terms, on the

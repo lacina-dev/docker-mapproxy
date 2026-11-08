@@ -1,5 +1,5 @@
 {
-  "_comment": "Map sources the robot UI offers (vitulus_ui, served as /api/map_sources). One entry per MapProxy layer in mapproxy.yaml: layer/grid/format must match it (the tile URL is /wmts/<layer>/<grid>/{z}/{x}/{y}.<format>). kind base = one at a time under the map, overlay = independent transparent layer on top. group (bases): photo = aerial/satellite imagery, map = drawn maps; the UI lists the bases in these two groups. id is the stable key of the browser settings and of the alignment offset (offset_key: layers that share one georeference share one offset). max_zoom = finest level worth fetching (the real level of the source; the UI magnifies beyond it), min_zoom = the source draws nothing below it. attribution: a string, or {en, cs} when it has words. layer_order (overlays): under = a tone right above the background map and UNDER the robot maps (relief, slope), over = lines ON TOP of the robot maps (cadastre, contours, buildings). blend_neutral (tone overlays, 0-1 or [r,g,b]): the colour the source draws flat ground in, so flat ground leaves the picture unchanged (the UI has built-in values for hillshade and slope). Esri Wayback (esri_wb_*): earlier releases of World Imagery; the date in the name is the release, the capture date differs by place.",
+  "_comment": "Map sources the robot UI offers (vitulus_ui, served as /api/map_sources). One entry per MapProxy layer in mapproxy.yaml: layer/grid/format must match it (the tile URL is /wmts/<layer>/<grid>/{z}/{x}/{y}.<format>). kind base = one at a time under the map, overlay = independent transparent layer on top. group (bases): photo = aerial/satellite imagery, map = drawn maps; the UI lists the bases in these two groups. id is the stable key of the browser settings and of the alignment offset (offset_key: layers that share one georeference share one offset). max_zoom = finest level worth fetching (the real level of the source; the UI magnifies beyond it), min_zoom = the source draws nothing below it. attribution: a string, or {en, cs} when it has words. layer_order (overlays): under = a tone right above the background map and UNDER the robot maps (relief, slope), over = lines ON TOP of the robot maps (cadastre, contours, buildings). blend_neutral (tone overlays, 0-1 or [r,g,b]): the colour the source draws flat ground in, so flat ground leaves the picture unchanged (the UI has built-in values for hillshade and slope). Esri Wayback (esri_wb_*): earlier releases of World Imagery; the date in the name is the release, the capture date differs by place. timeline {port} (overlays): the layer has time frames on the robot's own service at that port (vitulus_precip); the UI draws past frames and nowcast from it with a slider and uses this MapProxy layer (the newest frame) only while the service does not answer. redistributable false + license_note (not used by the UI): the terms of a source allow private use only, keep it off public endpoints.",
   "version": 1,
   "default_base": "sat",
   "sources": [
@@ -121,6 +121,15 @@
       "name": {"en": "Trees and buildings, relief (DMP\u00a01G)", "cs": "Stromy a budovy, reliéf (DMP\u00a01G)"},
       "max_zoom": 18, "default_opacity": 0.5, "layer_order": "under", "blend_neutral": 0.71,
       "attribution": {"en": "© ČÚZK (open data), lidar 2009–2013", "cs": "© ČÚZK, otevřená data, lidar 2009–2013"}, "offset_key": "cuzk"
+    },
+    {
+      "id": "precip", "kind": "overlay", "layer": "precip_mosaic", "grid": "gm_grid", "format": "png",
+      "name": {"en": "Precipitation (mosaic)", "cs": "Srážky (mozaika)"},
+      "min_zoom": 3, "max_zoom": 8, "default_opacity": 0.7, "layer_order": "over",
+      "timeline": {"port": 8097},
+      "attribution": "© EUMETNET OPERA (CC BY 4.0), © ČHMÚ, Weather data by RainViewer",
+      "redistributable": false,
+      "license_note": "Newest frame of the robot's own vitulus_precip service (port 8097, new frame every 5 min). RainViewer data are for personal, non-commercial use only and not redistributable: keep this layer private to the robot UI."
     }
   ]
 }

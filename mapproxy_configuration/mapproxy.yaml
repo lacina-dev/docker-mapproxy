@@ -115,6 +115,13 @@ layers:
   - name: cenia_hist_layer
     title: CENIA historical orthophoto, 1950s (greyscale JPEG, reprojected from S-JTSK, z18)
     sources: [cenia_hist_cache]
+  # ---- added 2026-11-08, T20 -------------------------------------------------
+  # Precipitation mosaic (OPERA, ČHMÚ, DWD, RainViewer merged by the robot's
+  # own vitulus_precip service on port 8097), newest frame only. Transparent
+  # PNG, nothing stored. The time slider of the UI talks to the service itself.
+  - name: precip_mosaic
+    title: Precipitation mosaic, latest frame (overlay, transparent PNG, vitulus_precip :8097)
+    sources: [precip_mosaic_cache]
 
 
 caches:
@@ -338,6 +345,19 @@ caches:
     format: image/jpeg
     upscale_tiles: 3
     cache: {type: file, directory_layout: tms}
+  # ---- T20: precipitation mosaic ---------------------------------------------
+  # The frame behind "latest" changes every 5 min: never stored, every request
+  # goes to the local service (which caches its rendered tiles itself).
+  # The service draws z3-z8 around the site (source max_res = z8); z9-z21
+  # are upscaled from the z8 tile (13 levels), one service request each.
+  precip_mosaic_cache:
+    grids: [ gm_grid ]
+    sources: [ precip_mosaic ]
+    format: image/png
+    disable_storage: true
+    upscale_tiles: 13
+    meta_size: [1, 1]
+    meta_buffer: 0
 
 
 sources:
@@ -600,6 +620,34 @@ sources:
       url: https://gis.cenia.cz/mapcache/ortofotomapa_historicka/wms
       layers: orto
       transparent: false
+  # ---- added 2026-11-08, T20 -------------------------------------------------
+  # vitulus_precip (its own container on the HOST network, precip-mosaic
+  # deploy/docker-compose.yml, port 8097 on all interfaces; or the same service
+  # started by hand / as the ROS node with server.host 0.0.0.0). This container runs on the compose
+  # bridge network, not the host network, so "localhost" would be the
+  # container itself: host.docker.internal is mapped to the host by
+  # extra_hosts (host-gateway) in docker-compose-build.yml.
+  # Outside its area (and below z3) the service answers an empty transparent
+  # PNG. Terms: OPERA CC BY 4.0, ČHMÚ open data, RainViewer personal use only
+  # (not redistributable) — the robot UI only, never a public endpoint.
+  precip_mosaic:
+    type: tile
+    url: http://host.docker.internal:8097/tiles/latest/%(z)s/%(x)s/%(y)s.png
+    grid: gm_grid
+    transparent: true
+    # finest level the service draws: z8 of gm_grid (611.5 m/px); max_res
+    # below the level value (see cuzk_ztm), the cache upscales z9-z21
+    max_res: 500
+    http:
+      # a hung service must not hold a uWSGI thread for the default 60 s
+      client_timeout: 15
+    # service down, not started, DNS name missing (container not recreated
+    # after the compose change), HTTP error: a transparent tile, so the layer
+    # is simply empty and nothing else is affected (no 500)
+    on_error:
+      other:
+        response: transparent
+        cache: false
 
 
 grids:
