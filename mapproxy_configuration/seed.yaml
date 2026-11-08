@@ -5,11 +5,13 @@
 # Run it ONLY through scripts/seed_garden.sh: it writes the area file
 # seed_area.wkt (next to this file, NOT in git: the site position is private)
 # from the robot's own map datum and runs mapproxy-seed with ONE request at a
-# time. Default is a dry run (counts only) of the task garden_cuzk (open
-# data); the commercial tasks run only when named with --tasks:
+# time. Default is a dry run (counts only) of the default tasks garden_cuzk
+# (open data) and garden_google_sat (the UI's default base, Google
+# satellite); the other commercial tasks run only when named with --tasks:
 #
-#     scripts/seed_garden.sh                       # dry run, garden_cuzk
-#     scripts/seed_garden.sh --go                  # fetch garden_cuzk
+#     scripts/seed_garden.sh                       # dry run, default tasks
+#     scripts/seed_garden.sh --go                  # fetch the default tasks
+#     scripts/seed_garden.sh --tasks garden_cuzk   # open data only
 #     scripts/seed_garden.sh --tasks garden_photo_esri   # dry run of another task
 #
 # 400 x 400 m (half side 200 m) is about 430 tiles per layer for z14-z20.
@@ -37,13 +39,20 @@ seeds:
     refresh_before:
       weeks: 52
   # commercial photo bases (Google, Esri, Bing): their terms do not allow
-  # caching; seeding them is the owner's call (decision D40) — run this task
-  # only when asked. Levels stop at each source's real level (the caches
-  # upscale beyond it). Open proposal for the owner (T17 audit M4-2): the
-  # UI's default base is Google satellite (gm_cache), but the default seed
-  # is garden_cuzk only, so offline the default base has only what was
-  # viewed before; adding garden_photo_google to the default tasks of
-  # seed_garden.sh would fill it. Not done without the owner's yes.
+  # caching; seeding them is the owner's call (decision D40).
+  # garden_google_sat is a DEFAULT task of scripts/seed_garden.sh (decided
+  # 2026-11-08, T17 audit M4-2): the UI's default base is Google satellite
+  # (gm_cache), so offline in the garden it has the whole square, not only
+  # what was viewed before. Same levels as garden_cuzk. Tiles already in the
+  # cache are kept (no refresh_before: the warm cache stays as it is).
+  garden_google_sat:
+    caches: [gm_cache]
+    coverages: [garden]
+    levels:
+      from: 14
+      to: 20
+  # the others run only when asked. Levels stop at each source's real level
+  # (the caches upscale beyond it).
   garden_photo_google:
     caches: [gm_cache, gm_hybrid_cache]
     coverages: [garden]

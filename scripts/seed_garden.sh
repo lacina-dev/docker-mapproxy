@@ -10,13 +10,14 @@
 # position is private). Without --go it is a dry run (mapproxy-seed -n:
 # counts the tiles, fetches nothing). With --go it fetches ONE tile at a time
 # (-c 1); run it when the robot is docked and the network is free.
-# Default tasks: garden_cuzk (open data). The commercial tasks
+# Default tasks: garden_cuzk (open data) and garden_google_sat (Google
+# satellite, the UI's default base). The other commercial tasks
 # (garden_photo_google/esri/bing) only when named.
 set -eu
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
 C="${MAPPROXY_CONTAINER:-docker-mapproxy-mapproxy-1}"
 UI="${VITULUS_UI:-http://localhost:7779}"
-GO=0; TASKS=garden_cuzk; HALF=200; LAT=""; LON=""
+GO=0; TASKS=garden_cuzk,garden_google_sat; HALF=200; LAT=""; LON=""
 while [ $# -gt 0 ]; do
     case "$1" in
         --go) GO=1 ;;

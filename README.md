@@ -215,7 +215,8 @@ mounted from this repo and starts MapProxy with `reloader=True`, so a saved
 * **Zoom limits.** Sources with fewer levels than `gm_grid` (z0–z21) carry
   `max_res` and their cache `upscale_tiles`, so finer levels are upscaled
   instead of fetched: OpenTopoMap z17, Esri and its Wayback releases z18,
-  the M6 DMR 5G / DMP 1G renderings z18 (2 m data), ČÚZK ZTM and Bing z19
+  the M6 DMR 5G / DMP 1G renderings z18 (2 m data), the CENIA 1950s
+  orthophoto z18 (0.5 m data), ČÚZK ZTM and Bing z19
   (the OSM `webmercator` grid ends at z19 itself). The ČÚZK orthophoto tiles end
   at z20; its z21 comes from the ČÚZK WMS (see "CUZK orthophoto cache"). Put
   `max_res` a little BELOW the resolution of the last real level (e.g. 0.25
@@ -257,7 +258,33 @@ mounted from this repo and starts MapProxy with `reloader=True`, so a saved
   cold relief tiles can delay slope/RÚIAN by a few seconds (lock wait is capped by
   `http.client_timeout`, 60 s, then 500). Aspect is a categorical colour map with no neutral
   colour: it tints the whole view, keep its opacity low.
-* **Terms.** ČÚZK layers are open data (CC BY 4.0). Google, Esri (also
+* **Historical orthophoto, 1950s (CENIA).** Layer `cenia_hist_layer`
+  (catalog id `cenia_1950s`, "Ortofoto 50. léta (CENIA)"): greyscale aerial
+  photos mostly from 1952–1954 (gaps filled with 1937–1970 and 1996),
+  0.5 m/px, from the CENIA MapCache WMS
+  `https://gis.cenia.cz/mapcache/ortofotomapa_historicka/wms` (layer `orto`).
+  The server answers only in S-JTSK (EPSG:5514, EPSG:3857 gives 400), so
+  MapProxy fetches each uncached 4×4 meta tile in S-JTSK and reprojects it
+  into `gm_grid` (PROJ, "S-JTSK to WGS 84 (5)", 1 m accuracy in Czechia; at a
+  public test point in Prague the picture sits within 0–3 px of the ČÚZK
+  orthophoto at z16, no constant shift). z18 is fetched, z19–z21 upscaled
+  from it (not stored). **CPU** (measured 2026-11-08 in
+  `kartoza/mapproxy:robot` on an i7-13650HX laptop, container cgroup CPU per
+  cold request, 8 meta tiles each): 86 ms (z16) / 126 ms (z18) median per
+  meta tile, i.e. 5–8 ms per stored tile, against 19 ms for a non-reprojected
+  JPEG WMS of the same size (`cuzk_hillshade_z10_layer`); one request of 16
+  took 700 ms. A cached tile costs ~1 ms, an upscaled z19 tile ~6 ms. The
+  robot's i7-8559U is slower per core (not measured there). Not seeded;
+  cleaned after 90 days like the Wayback releases (the photo never changes).
+  **Licence** checked in the CENIA metadata catalogue (micka): dataset record
+  `50210752-9d9c-4f47-956b-1951c0a80137` and view service record
+  `60b09c14-9538-4a0f-a66c-6118c0a80164` both give Creative Commons BY 4.0,
+  no limits on public access (open data), credit "Historická ortofotomapa ©
+  CENIA 2010 a © GEODIS BRNO, spol. s r.o. 2010, podkladové letecké snímky
+  poskytl VGHMÚř Dobruška, © MO ČR 2009" — shortened in the UI credit
+  (`ui_sources.json`).
+* **Terms.** ČÚZK layers and the CENIA 1950s orthophoto are open data (CC BY
+  4.0). Google, Esri (also
   the Esri Wayback releases `esri_wb_*`) and Bing tiles are used without an API key and cached against their terms, on the
   owner's decision (D40, private robot, few tiles); OSM/OpenTopoMap must not
   be bulk-downloaded (not in `seed.yaml`).
@@ -265,12 +292,18 @@ mounted from this repo and starts MapProxy with `reloader=True`, so a saved
   robot's map datum (from the UI's `/api/datum`) to
   `mapproxy_configuration/seed_area.wkt` (not in git: the position is
   private) and runs the tasks of `seed.yaml` with one request at a time. Dry
-  run by default; `--go` fetches; `--tasks` picks (default `garden_cuzk`,
-  open data only).
+  run by default; `--go` fetches; `--tasks` picks. Default tasks:
+  `garden_cuzk` (open data) and `garden_google_sat` (Google satellite
+  `gm_cache`, the UI's default base, same levels z14–z20, about 410 tiles for
+  the 400 m square; tiles already cached are kept), so offline in the garden
+  the default base covers the whole square. `--tasks garden_cuzk` = open data
+  only; the other commercial tasks (`garden_photo_google/esri/bing`) run only
+  when named.
 * **Cache cleanup.** `mapproxy_configuration/cleanup.yaml` removes old tiles
   from the online caches: after 90 days OSM, OpenTopoMap, Google map, the
-  relief ×10/×20, aspect and DMP 1G overlays and the Esri Wayback releases
-  (not seeded; a Wayback release never changes, it goes only to save disk);
+  relief ×10/×20, aspect and DMP 1G overlays, the Esri Wayback releases and
+  the CENIA 1950s orthophoto (not seeded; these photos never change, they go
+  only to save disk);
   after 52 weeks the layers the seed keeps for the garden (ZTM, cadastre,
   contours, relief, slope, buildings — the seed refreshes them at the same
   age, so run it again about once a year). The photo caches (Google

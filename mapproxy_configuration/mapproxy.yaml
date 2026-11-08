@@ -111,6 +111,10 @@ layers:
   - name: esri_wb_2022_r05_layer
     title: Esri World Imagery Wayback, release 2022-04-27 (JPEG, z18 here)
     sources: [esri_wb_2022_r05_cache]
+  # ---- added 2026-11-08, batch M6-1 ----------------------------------------
+  - name: cenia_hist_layer
+    title: CENIA historical orthophoto, 1950s (greyscale JPEG, reprojected from S-JTSK, z18)
+    sources: [cenia_hist_cache]
 
 
 caches:
@@ -319,6 +323,18 @@ caches:
   esri_wb_2022_r05_cache:
     grids: [ gm_grid ]
     sources: [ esri_wb_2022_r05 ]
+    format: image/jpeg
+    upscale_tiles: 3
+    cache: {type: file, directory_layout: tms}
+  # ---- batch M6-1 ------------------------------------------------------------
+  # CENIA historical orthophoto (1950s). The source answers only in S-JTSK
+  # (EPSG:5514): MapProxy fetches one 4x4 meta tile (+ buffer) in S-JTSK per
+  # uncached tile and reprojects it into gm_grid (CPU, see README). Data
+  # 0.5 m/px: z18 is fetched, z19-z21 upscaled from it. Never changes: cleaned
+  # after 90 days only to keep the disk small (cleanup.yaml).
+  cenia_hist_cache:
+    grids: [ gm_grid ]
+    sources: [ cenia_hist ]
     format: image/jpeg
     upscale_tiles: 3
     cache: {type: file, directory_layout: tms}
@@ -559,6 +575,31 @@ sources:
     url: https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/WMTS/1.0.0/default028mm/MapServer/tile/16245/%(z)s/%(y)s/%(x)s
     grid: gm_grid
     max_res: 0.5
+  # ---- added 2026-11-08, batch M6-1 ----------------------------------------
+  # CENIA "Historická ortofotomapa (50. léta)": aerial photos mostly from
+  # 1952-1954 (gaps filled with 1937-1970 and 1996), greyscale, 0.5 m/px.
+  # Licence CC BY 4.0 (metadata record of the dataset in the CENIA catalogue
+  # micka, 50210752-9d9c-4f47-956b-1951c0a80137; the view service record
+  # 60b09c14-9538-4a0f-a66c-6118c0a80164 says the same), credit "© CENIA 2010
+  # a © GEODIS BRNO 2010, snímky VGHMÚř Dobruška, © MO ČR 2009". MapCache WMS
+  # 1.1.1, EPSG:5514 only (EPSG:3857 answers 400): MapProxy reprojects with
+  # PROJ (S-JTSK to WGS 84 (5), 1 m accuracy in Czechia).
+  cenia_hist:
+    type: wms
+    supported_srs: ['EPSG:5514']
+    # z18 (0.597 m/px) is the finest level fetched; the server's finer
+    # levels only magnify the 0.5 m data. Below the level value, see cuzk_ztm.
+    max_res: 0.5
+    # its own host (gis.cenia.cz): one rendering at a time
+    concurrent_requests: 1
+    # extent from GetCapabilities: outside Czechia return empty tiles, no request
+    coverage:
+      bbox: [-925000, -1444353.536, -400646.464, -920000]
+      srs: 'EPSG:5514'
+    req:
+      url: https://gis.cenia.cz/mapcache/ortofotomapa_historicka/wms
+      layers: orto
+      transparent: false
 
 
 grids:
