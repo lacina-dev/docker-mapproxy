@@ -253,11 +253,51 @@ mounted from this repo and starts MapProxy with `reloader=True`, so a saved
   fallback tiles (white or old cache) are sent with max-age 1 h and one
   constant ETag; an open page shows them until it reloads the tiles.
 * **Shared WMS slots on ags.cuzk.cz.** MapProxy's `concurrent_requests` is a file
-  semaphore per host shared by all WMS sources on it: slope and RÚIAN (limit 1) use slot 0,
-  the new relief/aspect/DMP layers (limit 2) use slots 0 and 1 (picked at random), so a burst of
-  cold relief tiles can delay slope/RÚIAN by a few seconds (lock wait is capped by
-  `http.client_timeout`, 60 s, then 500). Aspect is a categorical colour map with no neutral
+  semaphore per host shared by all WMS sources on it: slope, RÚIAN and the relief ×10/×20,
+  aspect and DMP layers (limit 4 each since T17, before 1 and 2) pick one of the same 4 slots
+  (lock wait is capped by the source's `http.client_timeout`, 15 s, then 500). Measured at public points
+  in Prague (cold cache, 108 tiles of RÚIAN + slope + relief ×10 at z17/z18): 24 parallel tile
+  requests 4.2 s instead of 10.3 s (median of 7 runs each), RÚIAN complete after ~1.5 s
+  instead of ~5 s; 6 parallel (one browser) 7.3 s instead of 11.2 s; `mapproxy-seed -c 4`
+  6.5 s instead of 14.2 s (`seed_garden.sh` runs one request at a time: unchanged). The RÚIAN
+  WMS answered 96 direct GetMaps at 1/2/4/8 at once without a 429/503. One limit-4 burst met
+  an upstream read hanging 60 s while ČÚZK was slow: uWSGI `harakiri` (60 s) then kills the
+  whole worker with its other threads (42 of 108 tiles failed in that run). Hence the time
+  limits (`globals: http: client_timeout: 20`, the ČÚZK WMS sources 15 s): meta-tile lock 20 s
+  + slot 15 s + read 15 s = 50 s < 60 s. With a fake hung (and a 45 s slow) WMS in place of
+  RÚIAN, 36 RÚIAN + 36 OpenTopoMap tiles 24 at once: before (60/60 s) and with 30 s on the
+  source alone 20–35 RÚIAN requests were cut at 60 s by harakiri; with 20/15 s all 36 answered
+  500 within 45 s, no harakiri, OpenTopoMap all 200 in < 0.6 s. The 20 s is also the read
+  timeout of every source without its own value (normal tiles take well under 2 s, the
+  slowest ČÚZK rendering seen was 12 s). Aspect is a categorical colour map with no neutral
   colour: it tints the whole view, keep its opacity low.
+* **ČÚZK layers vs Google/Bing: ~1 m shift, not a MapProxy error** (measured
+  2026-11-08 at five public points in Prague: Ladronka, Ořechovka, náměstí
+  Míru, Letná, Karlín; phase correlation of 1024 px z19 mosaics). MapProxy
+  does not transform the ČÚZK layers: it asks the servers for EPSG:3857
+  directly (`supported_srs`). The servers turn S-JTSK into WGS 84 with the
+  7-parameter "S-JTSK to WGS 84 (1)" (EPSG:1623): RÚIAN address points from
+  the REST API in EPSG:3857 equal the EPSG:5514 ones run through that
+  transformation in PROJ to 0.00 m, the RÚIAN WMS image and the ORTOFOTO_WM
+  tiles match the S-JTSK images reprojected that way within 0.3 m (1.5 px).
+  That transformation lands in ETRS89, which moves with Europe: in 2026 a
+  point placed by its ETRS89 coordinates shows 0.77 m west and 0.58 m south
+  of its current WGS 84/ITRF position (PROJ, ETRS89 → ITRF2014 at epoch
+  2026.85). Google imagery sits +0.62…+0.79 m east
+  and +0.58…+0.80 m north of the ČÚZK orthophoto at four of the points (the
+  fifth, Letná, has no reliable match), Bing +0.25…+0.58 m east, +0.36…+0.51 m
+  north — the ETRS89 drift. Building outlines (RÚIAN) also never fit roofs
+  exactly on any photo: roofs lean away from the camera by up to a few
+  metres (not true orthophotos). So RÚIAN fits the ČÚZK orthophoto and is
+  ~1 m off Google by design. The UI aligns each georeference on its own
+  (catalog `offset_key`: RÚIAN, cadastre, relief share `cuzk`, Google bases
+  `sat`), which is the right place to correct it; shifting the ČÚZK layers
+  in MapProxy would break those stored alignments and mix shifted and
+  unshifted tiles in the caches. Requesting EPSG:5514 and reprojecting in
+  MapProxy gives the same result (PROJ's best S-JTSK transformations here
+  differ from EPSG:1623 by ≤ 0.05 m) at more CPU. The CENIA 1950s orthophoto,
+  reprojected by MapProxy, shares the ČÚZK georeference: in the catalog it
+  has `offset_key: "cuzk"`, so it uses the ČÚZK alignment of the UI.
 * **Historical orthophoto, 1950s (CENIA).** Layer `cenia_hist_layer`
   (catalog id `cenia_1950s`, "Ortofoto 50. léta (CENIA)"): greyscale aerial
   photos mostly from 1952–1954 (gaps filled with 1937–1970 and 1996),
@@ -310,6 +350,29 @@ mounted from this repo and starts MapProxy with `reloader=True`, so a saved
   the Esri Wayback releases `esri_wb_*`) and Bing tiles are used without an API key and cached against their terms, on the
   owner's decision (D40, private robot, few tiles); OSM/OpenTopoMap must not
   be bulk-downloaded (not in `seed.yaml`).
+* **Bing (`bing_layer`), checked 2026-11-08.** The URL
+  `ecn.t0.tiles.virtualearth.net/tiles/a<quadkey>.jpeg?g=1` is the tile
+  server the official Bing Maps Imagery Metadata API hands out (its
+  `imageUrl`), only without the key-based session and with an old
+  generation `g=1`, which still answers. It has worked unchanged for many
+  years (also `t1`…`t3`, same tile; HTTP 200 JPEG with `max-age` one year and
+  `X-VE-TileMeta-CaptureDatesRange`, the capture date of the tile). **Not
+  legal by the terms:** the metadata API without a key answers
+  `NoCredentials` with the notice that the content may not be used without
+  Microsoft's written consent; Bing Maps for Enterprise free (Basic) keys
+  stopped working on 2025-06-30, so no free key exists any more, and the
+  Enterprise licence (paid) ends on 2028-06-30 in favour of Azure Maps.
+  **Stability:** fine today, but nothing promises the endpoint after that
+  date; when it goes, the cached tiles still show, a new tile answers 500
+  (no `on_error` on purpose: an error must not be cached as an image).
+  **Recommendation: keep** it as the owner's D40 extra photo base (it is
+  never the default and is not in the default seed), and drop it from
+  `ui_sources.json` when it stops answering or by mid-2028. The legal
+  replacement is Azure Maps imagery (`tilesetId=microsoft.imagery`, key
+  required, Gen2 free tier ~1,000 imagery transactions = ~15,000 tiles a
+  month); it needs a key kept OUT of this public repo (MapProxy 1.16 does
+  not expand environment variables in the YAML: a git-ignored `base:`
+  include would be needed) and its caching terms checked first.
 * **Seeding the site.** `scripts/seed_garden.sh` writes a square around the
   robot's map datum (from the UI's `/api/datum`) to
   `mapproxy_configuration/seed_area.wkt` (not in git: the position is
@@ -321,6 +384,15 @@ mounted from this repo and starts MapProxy with `reloader=True`, so a saved
   the default base covers the whole square. `--tasks garden_cuzk` = open data
   only; the other commercial tasks (`garden_photo_google/esri/bing`) run only
   when named.
+* **Scripts run as the MapProxy user.** `seed_garden.sh`, `cache_cleanup.sh`
+  and `check_mapproxy_yaml.sh` call `docker exec -u <MAPPROXY_USER_ID>:<MAPPROXY_GROUP_ID>`
+  (read from the container, 1000:1000 here; override with `MAPPROXY_EXEC_USER`).
+  A plain `docker exec` runs as root: a seed run that way left the ČÚZK lock
+  file and the RÚIAN/slope cache directories owned by root, and the server
+  (uWSGI runs as `mapproxy`) answered 500 for slope, RÚIAN and relief until
+  the owner was fixed (`chown -R 1000:1000` of `cache_data`). Seed and
+  clean-up run in `cache_data`, where `--use-cache-lock` keeps its lock file
+  `.mapproxy_seed.lck` (before, as root, in the container's `/`).
 * **Cache cleanup.** `mapproxy_configuration/cleanup.yaml` removes old tiles
   from the online caches: after 90 days OSM, OpenTopoMap, Google map, the
   relief ×10/×20, aspect and DMP 1G overlays, the Esri Wayback releases and
@@ -331,7 +403,17 @@ mounted from this repo and starts MapProxy with `reloader=True`, so a saved
   age, so run it again about once a year). The photo caches (Google
   satellite/hybrid, Esri, Bing, ČÚZK orthophoto) and the old orthophoto
   cache are kept. `scripts/cache_cleanup.sh` runs it in the container
-  (`--dry-run` / `--summary` pass through). Weekly via a systemd **user** timer
+  (`--dry-run` / `--summary` pass through) through
+  `scripts/mapproxy_seed_tms.py`: plain `mapproxy-seed --cleanup` of MapProxy
+  1.16 never cleans z0–z9 of a `directory_layout: tms` cache (it looks for
+  the level directories `00`…`09`, tms stores `0`…`9`; `mapproxy/cache/path.py`
+  gives tms the generic `level_location` although `level_location_tms`
+  exists). The wrapper wires `level_location_tms` in for the clean-up run
+  only, so no cache moves (a layout change would orphan every stored tile).
+  Checked on a cache copy (tiles 120 days old, two levels kept fresh): plain
+  MapProxy left all old z0–z9 tiles (OpenTopoMap/Google map z0–z9, Wayback
+  z5–z9, relief z9), the wrapper removed them and kept the fresh ones; the
+  `tc` OSM cache is cleaned the same either way. Weekly via a systemd **user** timer
   (no root, logged in the user journal, catches up after downtime):
 
       ln -sf ~/catkin_ws/src/docker-mapproxy/scripts/systemd/mapproxy-cache-cleanup.{service,timer} ~/.config/systemd/user/

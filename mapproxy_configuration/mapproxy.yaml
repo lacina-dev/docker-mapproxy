@@ -385,6 +385,7 @@ sources:
     # For a rollback to the WMS remove min_res.
     type: wms
     supported_srs: ['EPSG:3857']
+    http: {client_timeout: 15}   # T17, see globals http
     # z21 only (0.0746 m/px); z20 (0.149 m/px) and coarser come from cuzk_wm
     min_res: 0.1
     on_error:
@@ -426,6 +427,7 @@ sources:
     # backgrounds. The server draws it from about z16 (scale limit).
     type: wms
     supported_srs: ['EPSG:3857']
+    http: {client_timeout: 15}   # T17, see globals http
     req:
       url: https://services.cuzk.cz/wms/wms.asp
       layers: KN_I
@@ -434,6 +436,7 @@ sources:
     # drawn by the server from about z16 (scale limit)
     type: wms
     supported_srs: ['EPSG:3857']
+    http: {client_timeout: 15}   # T17, see globals http
     req:
       url: https://ags.cuzk.cz/arcgis/services/ZABAGED_VRSTEVNICE/MapServer/WMSServer
       layers: '0'
@@ -441,6 +444,7 @@ sources:
   cuzk_hillshade:
     type: wms
     supported_srs: ['EPSG:3857']
+    http: {client_timeout: 15}   # T17, see globals http
     req:
       url: https://ags.cuzk.cz/arcgis2/services/dmr5g/ImageServer/WMSServer
       layers: 'dmr5g:GrayscaleHillshade'
@@ -450,10 +454,25 @@ sources:
   # mapproxy/config/loader.py): only WMS sources use it, as a file semaphore
   # in cache_data/locks keyed by the server's HOST NAME, so it holds across
   # all uWSGI processes and is SHARED by every WMS source on that host
-  # (here cuzk_slope + cuzk_ruian share one slot; contours, relief, cuzk z21
-  # and the tile sources on that host are not limited by it). The lock waits
-  # up to http.client_timeout (60 s) — slow RÚIAN meta tiles can queue past
-  # it. Tile sources (type: tile) accept the key and ignore it.
+  # (here the six ags.cuzk.cz WMS sources with a limit, cuzk_slope,
+  # cuzk_ruian and the batch M6 renderings, share 4 slots; contours, the
+  # relief cuzk_hillshade, cuzk z21 and the tile sources on that host are not
+  # limited by it). The lock waits up to the source's http.client_timeout
+  # (15 s for the ČÚZK WMS sources, see globals http). Tile
+  # sources (type: tile) accept the key and ignore it.
+  # T17: limit 4 instead of 1 (slope, RÚIAN) and 2 (M6), measured 2026-11-08
+  # at public points in Prague (local container, cold cache, 108 tiles of
+  # RÚIAN + slope + relief x10 at z17/z18): a burst of 24 parallel tile
+  # requests took 4.2 s instead of 10.3 s (median of 7 runs each), RÚIAN
+  # fully there after ~1.5 s instead of ~5 s; 6 parallel requests (one
+  # browser) 7.3 s instead of 11.2 s; mapproxy-seed -c 4 6.5 s instead of
+  # 14.2 s (scripts/seed_garden.sh runs -c 1: no change there). The RÚIAN
+  # WMS itself answered 96 parallel GetMaps at 1/2/4/8 at once with no
+  # 429/503, ~0.6-0.8 s each at any level. One of the 7 limit-4 bursts
+  # (right after a slow limit-1 run, ČÚZK slow at that time) met an upstream
+  # read hanging 60 s: uWSGI harakiri (60 s) killed 4 workers and 42 of 108
+  # tiles failed. A hung ČÚZK hurts with any limit (with 1 the waiters time
+  # out on the lock instead).
   gm_hybrid:
     type: tile
     url: https://mt0.google.com/vt/lyrs=y&hl=en&x=%(x)s&y=%(y)s&z=%(z)s
@@ -504,7 +523,8 @@ sources:
     # DMR 5G terrain slope, colour (yellow-orange-red = steeper), 2 m pixels
     type: wms
     supported_srs: ['EPSG:3857']
-    concurrent_requests: 1
+    http: {client_timeout: 15}   # T17, see globals http
+    concurrent_requests: 4
     req:
       url: https://ags.cuzk.cz/arcgis2/services/dmr5g/ImageServer/WMSServer
       layers: 'dmr5g:SlopeRGBMap'
@@ -514,7 +534,8 @@ sources:
     # address points with house numbers (AdresniMisto, from about z18)
     type: wms
     supported_srs: ['EPSG:3857']
-    concurrent_requests: 1
+    http: {client_timeout: 15}   # T17, see globals http
+    concurrent_requests: 4
     req:
       url: https://ags.cuzk.cz/arcgis/services/RUIAN/MapServer/WMSServer
       layers: 'StavebniObjekt,AdresniMisto'
@@ -523,18 +544,18 @@ sources:
   # DMR 5G (terrain) and DMP 1G (surface with trees and buildings) are ČÚZK
   # image services (2 m pixels, lidar 2009-2013), open data, no key; the
   # same server as cuzk_hillshade / cuzk_slope, other server-side renderings.
-  # concurrent_requests 2: the semaphore is per host (ags.cuzk.cz, see the
-  # note above gm_hybrid) and its slots are shared: cuzk_slope and
-  # cuzk_ruian (limit 1) use slot 0 only, these use slot 0 or 1. So at most
-  # two of these renderings run at once, and a slow RÚIAN meta tile holding
-  # slot 0 does not stop them.
+  # concurrent_requests 4: the semaphore is per host (ags.cuzk.cz, see the
+  # note above gm_hybrid) and its slots are shared: these, cuzk_slope and
+  # cuzk_ruian all pick one of the same 4 slots (at random, then the next
+  # free one), so at most 4 renderings of them run on ags.cuzk.cz at once.
   # max_res: finest level fetched is z18 (0.597 m/px); 0.5 sits below the
   # level value (see cuzk_ztm), the caches upscale z19-z21.
   cuzk_hillshade_z10:
     # shaded relief with heights x10: a flat garden's micro-relief shows
     type: wms
     supported_srs: ['EPSG:3857']
-    concurrent_requests: 2
+    http: {client_timeout: 15}   # T17, see globals http
+    concurrent_requests: 4
     max_res: 0.5
     req:
       url: https://ags.cuzk.cz/arcgis2/services/dmr5g/ImageServer/WMSServer
@@ -544,7 +565,8 @@ sources:
     # the same with heights x20 (deep shadows on real slopes)
     type: wms
     supported_srs: ['EPSG:3857']
-    concurrent_requests: 2
+    http: {client_timeout: 15}   # T17, see globals http
+    concurrent_requests: 4
     max_res: 0.5
     req:
       url: https://ags.cuzk.cz/arcgis2/services/dmr5g/ImageServer/WMSServer
@@ -554,7 +576,8 @@ sources:
     # aspect = which way the ground faces, colour by direction
     type: wms
     supported_srs: ['EPSG:3857']
-    concurrent_requests: 2
+    http: {client_timeout: 15}   # T17, see globals http
+    concurrent_requests: 4
     max_res: 0.5
     req:
       url: https://ags.cuzk.cz/arcgis2/services/dmr5g/ImageServer/WMSServer
@@ -564,7 +587,8 @@ sources:
     # DMP 1G shaded: tree crowns and buildings (as in 2009-2013)
     type: wms
     supported_srs: ['EPSG:3857']
-    concurrent_requests: 2
+    http: {client_timeout: 15}   # T17, see globals http
+    concurrent_requests: 4
     max_res: 0.5
     req:
       url: https://ags.cuzk.cz/arcgis2/services/dmp1g/ImageServer/WMSServer
@@ -612,6 +636,7 @@ sources:
     max_res: 0.5
     # its own host (gis.cenia.cz): one rendering at a time
     concurrent_requests: 1
+    http: {client_timeout: 15}   # T17, see globals http (lock 20 + slot 15 + read 15 < harakiri 60)
     # extent from GetCapabilities: outside Czechia return empty tiles, no request
     coverage:
       bbox: [-925000, -1444353.536, -400646.464, -920000]
@@ -639,7 +664,8 @@ sources:
     # below the level value (see cuzk_ztm), the cache upscales z9-z21
     max_res: 500
     http:
-      # a hung service must not hold a uWSGI thread for the default 60 s
+      # a hung service must not hold a uWSGI thread for the global 20 s
+      # (globals http)
       client_timeout: 15
     # service down, not started, DNS name missing (container not recreated
     # after the compose change), HTTP error: a transparent tile, so the layer
@@ -663,6 +689,22 @@ grids:
 
 
 globals:
+  # T17: time limits under uWSGI harakiri (60 s, build_data/uwsgi.ini), which
+  # kills a whole worker with its other 9 threads (other layers' requests
+  # die with it). A tile request waits at most for: the meta-tile lock
+  # (global http.client_timeout, MapProxy 1.16 has no per-cache value) +
+  # the concurrent_requests slot (the source's client_timeout) + the source
+  # read (the same). The ČÚZK WMS sources have 15 s: 20 + 15 + 15 = 50 s.
+  # Measured 2026-11-08 with a fake hung/45-s-slow WMS in place of RÚIAN
+  # (36 RÚIAN + 36 OpenTopoMap tiles, 24 at once): with 60/60 s (before)
+  # and with 30 s on the source only, 20-35 RÚIAN requests were cut at
+  # 60 s by harakiri (connection dropped); with 20/15 s all 36 answered 500
+  # within 45 s, no harakiri, OpenTopoMap 36x 200 in < 0.6 s throughout.
+  # Normal ČÚZK renderings take 0.5-2 s (slowest seen 12 s), other sources
+  # well under 1 s; the global 20 s also is the read timeout of every source
+  # without its own value.
+  http:
+    client_timeout: 20
   #next are some global configuration options for MapProxy. They mostly explain themselves, or can be looked-up in the MapProxy docs.
   cache:
     # where to store the cached images

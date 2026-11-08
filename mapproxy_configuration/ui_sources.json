@@ -46,7 +46,7 @@
     {
       "id": "cenia_1950s", "kind": "base", "group": "photo", "layer": "cenia_hist_layer", "grid": "gm_grid", "format": "jpeg",
       "name": {"en": "Orthophoto 1950s (CENIA)", "cs": "Ortofoto 50. léta (CENIA)"},
-      "max_zoom": 18, "attribution": {"en": "Historical orthophoto © CENIA, GEODIS BRNO 2010 (CC BY 4.0); imagery VGHMÚř Dobruška, © MO ČR 2009", "cs": "Historická ortofotomapa © CENIA, GEODIS BRNO 2010 (CC BY 4.0); snímky VGHMÚř Dobruška, © MO ČR 2009"}
+      "max_zoom": 18, "attribution": {"en": "Historical orthophoto © CENIA, GEODIS BRNO 2010 (CC BY 4.0); imagery VGHMÚř Dobruška, © MO ČR 2009", "cs": "Historická ortofotomapa © CENIA, GEODIS BRNO 2010 (CC BY 4.0); snímky VGHMÚř Dobruška, © MO ČR 2009"}, "offset_key": "cuzk"
     },
     {
       "id": "gmap", "kind": "base", "group": "map", "layer": "gm_map_layer", "grid": "gm_grid", "format": "png",

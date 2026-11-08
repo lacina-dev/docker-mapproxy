@@ -53,4 +53,11 @@ docker inspect -f '{{.State.Running}}' "$C" 2>/dev/null | grep -q true \
 ARGS=(-f /mapproxy/mapproxy.yaml -s /mapproxy/seed.yaml --seed "$TASKS" -c 1 --use-cache-lock)
 [ "$GO" = 1 ] || ARGS+=(--dry-run)
 echo "seed: tasks=$TASKS half=${HALF} m $([ "$GO" = 1 ] && echo FETCHING || echo 'dry run (add --go to fetch)')"
-exec docker exec "$C" nice -n 10 mapproxy-seed "${ARGS[@]}"
+# run as the MapProxy user (uid:gid of MAPPROXY_USER_ID/GROUP_ID, which
+# start.sh gives the uWSGI server), never as root: a root-owned lock file or
+# cache directory makes the server answer 500 for those layers. Working
+# directory cache_data: --use-cache-lock keeps its lock file
+# .mapproxy_seed.lck in the current directory (seed and clean-up share it)
+U="${MAPPROXY_EXEC_USER:-$(docker exec "$C" sh -c 'echo "${MAPPROXY_USER_ID:-1000}:${MAPPROXY_GROUP_ID:-1000}"')}"
+docker exec -u "$U" "$C" mkdir -p /mapproxy/cache_data
+exec docker exec -u "$U" -w /mapproxy/cache_data "$C" nice -n 10 mapproxy-seed "${ARGS[@]}"

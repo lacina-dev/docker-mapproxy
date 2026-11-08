@@ -26,13 +26,17 @@ C="${MAPPROXY_CONTAINER:-docker-mapproxy-mapproxy-1}"
 docker inspect -f '{{.State.Running}}' "$C" 2>/dev/null | grep -q true \
     || { echo "container $C is not running — cannot check"; exit 2; }
 
+# run as the MapProxy user (uid:gid of MAPPROXY_USER_ID/GROUP_ID, which
+# start.sh gives the uWSGI server), never as root: a root-owned lock file or
+# cache directory makes the server answer 500 for those layers
+U="${MAPPROXY_EXEC_USER:-$(docker exec "$C" sh -c 'echo "${MAPPROXY_USER_ID:-1000}:${MAPPROXY_GROUP_ID:-1000}"')}"
 TMP="/tmp/check_mapproxy_$$"
-docker exec "$C" mkdir -p "$TMP" >/dev/null
-trap 'docker exec "$C" rm -rf "$TMP" >/dev/null 2>&1' EXIT
+docker exec -u "$U" "$C" mkdir -p "$TMP" >/dev/null
+trap 'docker exec -u "$U" "$C" rm -rf "$TMP" >/dev/null 2>&1' EXIT
 docker cp "$FILE" "$C:$TMP/mapproxy.yaml" >/dev/null
 [ -f "$CATALOG" ] && docker cp "$CATALOG" "$C:$TMP/ui_sources.json" >/dev/null
 
-docker exec -i -w "$TMP" "$C" python3 - <<'EOF'
+docker exec -i -u "$U" -w "$TMP" "$C" python3 - <<'EOF'
 import json, os, sys
 from mapproxy.config.loader import load_configuration, load_configuration_file, ConfigurationError
 from mapproxy.config.validator import validate_references
