@@ -214,8 +214,9 @@ mounted from this repo and starts MapProxy with `reloader=True`, so a saved
   Without an argument it checks the live file.
 * **Zoom limits.** Sources with fewer levels than `gm_grid` (z0–z21) carry
   `max_res` and their cache `upscale_tiles`, so finer levels are upscaled
-  instead of fetched: OpenTopoMap z17, Esri z18, ČÚZK ZTM and Bing z19 (the
-  OSM `webmercator` grid ends at z19 itself). The ČÚZK orthophoto tiles end
+  instead of fetched: OpenTopoMap z17, Esri and its Wayback releases z18,
+  the M6 DMR 5G / DMP 1G renderings z18 (2 m data), ČÚZK ZTM and Bing z19
+  (the OSM `webmercator` grid ends at z19 itself). The ČÚZK orthophoto tiles end
   at z20; its z21 comes from the ČÚZK WMS (see "CUZK orthophoto cache"). Put
   `max_res` a little BELOW the resolution of the last real level (e.g. 0.25
   for z19 = 0.2986 m/px): the exact value is lost to float rounding and the
@@ -250,8 +251,14 @@ mounted from this repo and starts MapProxy with `reloader=True`, so a saved
   around the site against the dry-run estimate first. Offline the orthophoto
   fallback tiles (white or old cache) are sent with max-age 1 h and one
   constant ETag; an open page shows them until it reloads the tiles.
-* **Terms.** ČÚZK layers are open data (CC BY 4.0). Google, Esri and Bing
-  tiles are used without an API key and cached against their terms, on the
+* **Shared WMS slots on ags.cuzk.cz.** MapProxy's `concurrent_requests` is a file
+  semaphore per host shared by all WMS sources on it: slope and RÚIAN (limit 1) use slot 0,
+  the new relief/aspect/DMP layers (limit 2) use slots 0 and 1 (picked at random), so a burst of
+  cold relief tiles can delay slope/RÚIAN by a few seconds (lock wait is capped by
+  `http.client_timeout`, 60 s, then 500). Aspect is a categorical colour map with no neutral
+  colour: it tints the whole view, keep its opacity low.
+* **Terms.** ČÚZK layers are open data (CC BY 4.0). Google, Esri (also
+  the Esri Wayback releases `esri_wb_*`) and Bing tiles are used without an API key and cached against their terms, on the
   owner's decision (D40, private robot, few tiles); OSM/OpenTopoMap must not
   be bulk-downloaded (not in `seed.yaml`).
 * **Seeding the site.** `scripts/seed_garden.sh` writes a square around the
@@ -261,7 +268,9 @@ mounted from this repo and starts MapProxy with `reloader=True`, so a saved
   run by default; `--go` fetches; `--tasks` picks (default `garden_cuzk`,
   open data only).
 * **Cache cleanup.** `mapproxy_configuration/cleanup.yaml` removes old tiles
-  from the online caches: after 90 days OSM, OpenTopoMap and Google map;
+  from the online caches: after 90 days OSM, OpenTopoMap, Google map, the
+  relief ×10/×20, aspect and DMP 1G overlays and the Esri Wayback releases
+  (not seeded; a Wayback release never changes, it goes only to save disk);
   after 52 weeks the layers the seed keeps for the garden (ZTM, cadastre,
   contours, relief, slope, buildings — the seed refreshes them at the same
   age, so run it again about once a year). The photo caches (Google

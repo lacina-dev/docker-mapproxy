@@ -1,5 +1,5 @@
 {
-  "_comment": "Map sources the robot UI offers (vitulus_ui, served as /api/map_sources). One entry per MapProxy layer in mapproxy.yaml: layer/grid/format must match it (the tile URL is /wmts/<layer>/<grid>/{z}/{x}/{y}.<format>). kind base = one at a time under the map, overlay = independent transparent layer on top. group (bases): photo = aerial/satellite imagery, map = drawn maps; the UI lists the bases in these two groups. id is the stable key of the browser settings and of the alignment offset (offset_key: layers that share one georeference share one offset). max_zoom = finest level worth fetching (the real level of the source; the UI magnifies beyond it), min_zoom = the source draws nothing below it. attribution: a string, or {en, cs} when it has words. layer_order (overlays): under = a tone right above the background map and UNDER the robot maps (relief, slope), over = lines ON TOP of the robot maps (cadastre, contours, buildings).",
+  "_comment": "Map sources the robot UI offers (vitulus_ui, served as /api/map_sources). One entry per MapProxy layer in mapproxy.yaml: layer/grid/format must match it (the tile URL is /wmts/<layer>/<grid>/{z}/{x}/{y}.<format>). kind base = one at a time under the map, overlay = independent transparent layer on top. group (bases): photo = aerial/satellite imagery, map = drawn maps; the UI lists the bases in these two groups. id is the stable key of the browser settings and of the alignment offset (offset_key: layers that share one georeference share one offset). max_zoom = finest level worth fetching (the real level of the source; the UI magnifies beyond it), min_zoom = the source draws nothing below it. attribution: a string, or {en, cs} when it has words. layer_order (overlays): under = a tone right above the background map and UNDER the robot maps (relief, slope), over = lines ON TOP of the robot maps (cadastre, contours, buildings). blend_neutral (tone overlays, 0-1 or [r,g,b]): the colour the source draws flat ground in, so flat ground leaves the picture unchanged (the UI has built-in values for hillshade and slope). Esri Wayback (esri_wb_*): earlier releases of World Imagery; the date in the name is the release, the capture date differs by place.",
   "version": 1,
   "default_base": "sat",
   "sources": [
@@ -16,7 +16,7 @@
     {
       "id": "cuzk", "kind": "base", "group": "photo", "layer": "cuzk_ortho_layer", "grid": "gm_grid", "format": "jpeg",
       "name": {"en": "Orthophoto ČÚZK", "cs": "Ortofoto ČÚZK"},
-      "max_zoom": 20, "attribution": {"en": "© ČÚZK (open data)", "cs": "© ČÚZK, otevřená data"}
+      "max_zoom": 20, "attribution": {"en": "© ČÚZK (open data), imagery 2024–2025", "cs": "© ČÚZK, otevřená data, snímky 2024–2025"}
     },
     {
       "id": "esri", "kind": "base", "group": "photo", "layer": "esri_layer", "grid": "gm_grid", "format": "jpeg",
@@ -27,6 +27,21 @@
       "id": "bing", "kind": "base", "group": "photo", "layer": "bing_layer", "grid": "gm_grid", "format": "jpeg",
       "name": {"en": "Aerial (Bing)", "cs": "Letecké snímky (Bing)"},
       "max_zoom": 19, "attribution": {"en": "Imagery © Microsoft", "cs": "Snímky © Microsoft"}
+    },
+    {
+      "id": "esri_wb_2025_04", "kind": "base", "group": "photo", "layer": "esri_wb_2025_r04_layer", "grid": "gm_grid", "format": "jpeg",
+      "name": {"en": "Esri archive 2025-04 (Wayback)", "cs": "Archiv Esri 2025-04 (Wayback)"},
+      "max_zoom": 18, "attribution": "Imagery © Esri, Maxar, Earthstar Geographics · World Imagery Wayback 2025-04-24"
+    },
+    {
+      "id": "esri_wb_2023_06", "kind": "base", "group": "photo", "layer": "esri_wb_2023_r05_layer", "grid": "gm_grid", "format": "jpeg",
+      "name": {"en": "Esri archive 2023-06 (Wayback)", "cs": "Archiv Esri 2023-06 (Wayback)"},
+      "max_zoom": 18, "attribution": "Imagery © Esri, Maxar, Earthstar Geographics · World Imagery Wayback 2023-06-13"
+    },
+    {
+      "id": "esri_wb_2022_04", "kind": "base", "group": "photo", "layer": "esri_wb_2022_r05_layer", "grid": "gm_grid", "format": "jpeg",
+      "name": {"en": "Esri archive 2022-04 (Wayback)", "cs": "Archiv Esri 2022-04 (Wayback)"},
+      "max_zoom": 18, "attribution": "Imagery © Esri, Maxar, Earthstar Geographics · World Imagery Wayback 2022-04-27"
     },
     {
       "id": "gmap", "kind": "base", "group": "map", "layer": "gm_map_layer", "grid": "gm_grid", "format": "png",
@@ -77,6 +92,30 @@
       "name": {"en": "Slope (DMR\u00a05G)", "cs": "Sklon terénu (DMR\u00a05G)"},
       "min_zoom": 14, "max_zoom": 19, "default_opacity": 0.45, "layer_order": "under",
       "attribution": {"en": "© ČÚZK (open data)", "cs": "© ČÚZK, otevřená data"}, "offset_key": "cuzk"
+    },
+    {
+      "id": "relief_x10", "kind": "overlay", "layer": "cuzk_hillshade_z10_layer", "grid": "gm_grid", "format": "jpeg",
+      "name": {"en": "Shaded relief ×10 (DMR\u00a05G)", "cs": "Stínovaný reliéf ×10 (DMR\u00a05G)"},
+      "max_zoom": 18, "default_opacity": 0.5, "layer_order": "under", "blend_neutral": 0.71,
+      "attribution": {"en": "© ČÚZK (open data)", "cs": "© ČÚZK, otevřená data"}, "offset_key": "cuzk"
+    },
+    {
+      "id": "relief_x20", "kind": "overlay", "layer": "cuzk_hillshade_z20_layer", "grid": "gm_grid", "format": "jpeg",
+      "name": {"en": "Shaded relief ×20 (DMR\u00a05G)", "cs": "Stínovaný reliéf ×20 (DMR\u00a05G)"},
+      "max_zoom": 18, "default_opacity": 0.45, "layer_order": "under", "blend_neutral": 0.71,
+      "attribution": {"en": "© ČÚZK (open data)", "cs": "© ČÚZK, otevřená data"}, "offset_key": "cuzk"
+    },
+    {
+      "id": "aspect", "kind": "overlay", "layer": "cuzk_aspect_layer", "grid": "gm_grid", "format": "jpeg",
+      "name": {"en": "Aspect, slope direction (DMR\u00a05G)", "cs": "Expozice svahů (DMR\u00a05G)"},
+      "max_zoom": 18, "default_opacity": 0.35, "layer_order": "under",
+      "attribution": {"en": "© ČÚZK (open data)", "cs": "© ČÚZK, otevřená data"}, "offset_key": "cuzk"
+    },
+    {
+      "id": "surface_relief", "kind": "overlay", "layer": "cuzk_dmp_hillshade_layer", "grid": "gm_grid", "format": "jpeg",
+      "name": {"en": "Trees and buildings, relief (DMP\u00a01G)", "cs": "Stromy a budovy, reliéf (DMP\u00a01G)"},
+      "max_zoom": 18, "default_opacity": 0.5, "layer_order": "under", "blend_neutral": 0.71,
+      "attribution": {"en": "© ČÚZK (open data), lidar 2009–2013", "cs": "© ČÚZK, otevřená data, lidar 2009–2013"}, "offset_key": "cuzk"
     }
   ]
 }

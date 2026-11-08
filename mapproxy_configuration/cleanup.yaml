@@ -4,7 +4,10 @@
 #
 # Old tiles are removed and fetched again on the next view, so the street,
 # topo and cadastre layers follow their sources:
-# - not seeded (OSM, OpenTopoMap, Google map): after 90 days;
+# - not seeded (OSM, OpenTopoMap, Google map; batch M6: the relief x10/x20,
+#   aspect and DMP 1G overlays and the Esri Wayback releases): after 90
+#   days. A Wayback release never changes: its tiles go only to keep the
+#   disk small, a later view fetches the same picture again;
 # - seeded for the garden by seed.yaml (task garden_cuzk: ZTM, cadastre,
 #   contours, relief, slope, buildings): after 52 weeks, the same age at
 #   which the seed refreshes them (refresh_before: weeks: 52). 90 days here
@@ -18,7 +21,10 @@
 # (one task per grid and age: MapProxy cleans the caches of a task together)
 cleanups:
   online_gm_grid_90d:
-    caches: [otm_cache, gm_map_cache]
+    caches: [otm_cache, gm_map_cache,
+             cuzk_hillshade_z10_cache, cuzk_hillshade_z20_cache, cuzk_aspect_cache,
+             cuzk_dmp_hillshade_cache,
+             esri_wb_2025_r04_cache, esri_wb_2023_r05_cache, esri_wb_2022_r05_cache]
     remove_before:
       days: 90
   seeded_gm_grid_52w:

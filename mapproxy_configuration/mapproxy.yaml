@@ -87,6 +87,30 @@ layers:
   - name: cuzk_ruian_layer
     title: CUZK RUIAN buildings and house numbers (overlay)
     sources: [cuzk_ruian_cache]
+  # ---- added 2026-11-08, batch M6 ------------------------------------------
+  # More DMR 5G / DMP 1G renderings (tone overlays, opaque JPEG - the UI
+  # multiplies them over the base map) and older Esri imagery (Wayback).
+  - name: cuzk_hillshade_z10_layer
+    title: CUZK DMR 5G shaded relief, height x10 (overlay, opaque grey)
+    sources: [cuzk_hillshade_z10_cache]
+  - name: cuzk_hillshade_z20_layer
+    title: CUZK DMR 5G shaded relief, height x20 (overlay, opaque grey)
+    sources: [cuzk_hillshade_z20_cache]
+  - name: cuzk_aspect_layer
+    title: CUZK DMR 5G aspect - slope direction (overlay, opaque colour)
+    sources: [cuzk_aspect_cache]
+  - name: cuzk_dmp_hillshade_layer
+    title: CUZK DMP 1G shaded surface - trees and buildings (overlay, opaque grey)
+    sources: [cuzk_dmp_hillshade_cache]
+  - name: esri_wb_2025_r04_layer
+    title: Esri World Imagery Wayback, release 2025-04-24 (JPEG, z18 here)
+    sources: [esri_wb_2025_r04_cache]
+  - name: esri_wb_2023_r05_layer
+    title: Esri World Imagery Wayback, release 2023-06-13 (JPEG, z18 here)
+    sources: [esri_wb_2023_r05_cache]
+  - name: esri_wb_2022_r05_layer
+    title: Esri World Imagery Wayback, release 2022-04-27 (JPEG, z18 here)
+    sources: [esri_wb_2022_r05_cache]
 
 
 caches:
@@ -243,6 +267,60 @@ caches:
     minimize_meta_requests: true   # WMS clients only, see cuzk_slope_cache
     # empty (fully transparent) tiles share one file
     link_single_color_images: true
+    cache: {type: file, directory_layout: tms}
+  # ---- batch M6 --------------------------------------------------------------
+  # DMR 5G / DMP 1G renderings: the data has 2 m pixels, so z18 (0.6 m/px in
+  # Web Mercator, ~0.38 m on the ground here) is already 5x finer than the
+  # data. Finer levels are upscaled from z18 (source max_res) instead of
+  # fetched; the UI stops at z18 (max_zoom) and magnifies on its own.
+  cuzk_hillshade_z10_cache:
+    grids: [ gm_grid ]
+    sources: [ cuzk_hillshade_z10 ]
+    format: image/jpeg
+    upscale_tiles: 3
+    minimize_meta_requests: true   # WMS clients only, see cuzk_slope_cache
+    cache: {type: file, directory_layout: tms}
+  cuzk_hillshade_z20_cache:
+    grids: [ gm_grid ]
+    sources: [ cuzk_hillshade_z20 ]
+    format: image/jpeg
+    upscale_tiles: 3
+    minimize_meta_requests: true
+    cache: {type: file, directory_layout: tms}
+  cuzk_aspect_cache:
+    grids: [ gm_grid ]
+    sources: [ cuzk_aspect ]
+    format: image/jpeg
+    upscale_tiles: 3
+    minimize_meta_requests: true
+    cache: {type: file, directory_layout: tms}
+  cuzk_dmp_hillshade_cache:
+    grids: [ gm_grid ]
+    sources: [ cuzk_dmp_hillshade ]
+    format: image/jpeg
+    upscale_tiles: 3
+    minimize_meta_requests: true
+    cache: {type: file, directory_layout: tms}
+  # Esri Wayback releases (as esri_cache: real levels up to z18 at the site,
+  # finer levels upscaled). A release never changes, so a stored tile stays
+  # right; cleaned after 90 days only to keep the disk small (cleanup.yaml).
+  esri_wb_2025_r04_cache:
+    grids: [ gm_grid ]
+    sources: [ esri_wb_2025_r04 ]
+    format: image/jpeg
+    upscale_tiles: 3
+    cache: {type: file, directory_layout: tms}
+  esri_wb_2023_r05_cache:
+    grids: [ gm_grid ]
+    sources: [ esri_wb_2023_r05 ]
+    format: image/jpeg
+    upscale_tiles: 3
+    cache: {type: file, directory_layout: tms}
+  esri_wb_2022_r05_cache:
+    grids: [ gm_grid ]
+    sources: [ esri_wb_2022_r05 ]
+    format: image/jpeg
+    upscale_tiles: 3
     cache: {type: file, directory_layout: tms}
 
 
@@ -405,6 +483,82 @@ sources:
       url: https://ags.cuzk.cz/arcgis/services/RUIAN/MapServer/WMSServer
       layers: 'StavebniObjekt,AdresniMisto'
       transparent: true
+  # ---- added 2026-11-08, batch M6 ------------------------------------------
+  # DMR 5G (terrain) and DMP 1G (surface with trees and buildings) are ČÚZK
+  # image services (2 m pixels, lidar 2009-2013), open data, no key; the
+  # same server as cuzk_hillshade / cuzk_slope, other server-side renderings.
+  # concurrent_requests 2: the semaphore is per host (ags.cuzk.cz, see the
+  # note above gm_hybrid) and its slots are shared: cuzk_slope and
+  # cuzk_ruian (limit 1) use slot 0 only, these use slot 0 or 1. So at most
+  # two of these renderings run at once, and a slow RÚIAN meta tile holding
+  # slot 0 does not stop them.
+  # max_res: finest level fetched is z18 (0.597 m/px); 0.5 sits below the
+  # level value (see cuzk_ztm), the caches upscale z19-z21.
+  cuzk_hillshade_z10:
+    # shaded relief with heights x10: a flat garden's micro-relief shows
+    type: wms
+    supported_srs: ['EPSG:3857']
+    concurrent_requests: 2
+    max_res: 0.5
+    req:
+      url: https://ags.cuzk.cz/arcgis2/services/dmr5g/ImageServer/WMSServer
+      layers: 'dmr5g:GrayscaleHillshadeZ10'
+      transparent: false
+  cuzk_hillshade_z20:
+    # the same with heights x20 (deep shadows on real slopes)
+    type: wms
+    supported_srs: ['EPSG:3857']
+    concurrent_requests: 2
+    max_res: 0.5
+    req:
+      url: https://ags.cuzk.cz/arcgis2/services/dmr5g/ImageServer/WMSServer
+      layers: 'dmr5g:GrayscaleHillshadeZ20'
+      transparent: false
+  cuzk_aspect:
+    # aspect = which way the ground faces, colour by direction
+    type: wms
+    supported_srs: ['EPSG:3857']
+    concurrent_requests: 2
+    max_res: 0.5
+    req:
+      url: https://ags.cuzk.cz/arcgis2/services/dmr5g/ImageServer/WMSServer
+      layers: 'dmr5g:AspectRGBMap'
+      transparent: false
+  cuzk_dmp_hillshade:
+    # DMP 1G shaded: tree crowns and buildings (as in 2009-2013)
+    type: wms
+    supported_srs: ['EPSG:3857']
+    concurrent_requests: 2
+    max_res: 0.5
+    req:
+      url: https://ags.cuzk.cz/arcgis2/services/dmp1g/ImageServer/WMSServer
+      layers: 'dmp1g:GrayscaleHillshade'
+      transparent: false
+  # Esri World Imagery Wayback: earlier releases of World Imagery, same terms
+  # as esri (D40), no key. Tile order release/z/y/x; a tile that a release
+  # took over unchanged from an older one answers 301 to that release (the
+  # HTTP client follows it). Picked from the 198 releases with the Wayback
+  # metadata (tilemap service, 2026-11-08): releases whose z18 tile at the
+  # site differs from the next newer one were 2025-10 (the newest, =
+  # esri_layer), 2025-04, 2024-02, 2023-06 and 2022-04. 2024-02 is left out:
+  # at a public test point (Prague) its tile is byte for byte the 2025-04
+  # one. There the three kept show three capture dates, all older than
+  # esri_layer's (metadata SRC_DATE).
+  esri_wb_2025_r04:
+    type: tile
+    url: https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/WMTS/1.0.0/default028mm/MapServer/tile/27982/%(z)s/%(y)s/%(x)s
+    grid: gm_grid
+    max_res: 0.5
+  esri_wb_2023_r05:
+    type: tile
+    url: https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/WMTS/1.0.0/default028mm/MapServer/tile/25982/%(z)s/%(y)s/%(x)s
+    grid: gm_grid
+    max_res: 0.5
+  esri_wb_2022_r05:
+    type: tile
+    url: https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/WMTS/1.0.0/default028mm/MapServer/tile/16245/%(z)s/%(y)s/%(x)s
+    grid: gm_grid
+    max_res: 0.5
 
 
 grids:
