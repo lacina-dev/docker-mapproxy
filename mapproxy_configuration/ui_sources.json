@@ -1,36 +1,62 @@
 {
-  "_comment": "Map sources the robot UI offers (vitulus_ui, served as /api/map_sources). One entry per MapProxy layer in mapproxy.yaml: layer/grid/format must match it (the tile URL is /wmts/<layer>/<grid>/{z}/{x}/{y}.<format>). kind base = one at a time under the map, overlay = independent transparent layer on top. id is the stable key of the browser settings and of the alignment offset (offset_key: layers that share one georeference share one offset). max_zoom = finest level worth fetching, min_zoom = the source draws nothing below it. attribution: a string, or {en, cs} when it has words. layer_order (overlays): under = a tone right above the background map and UNDER the robot maps (relief), over = lines ON TOP of the robot maps (cadastre, contours).",
+  "_comment": "Map sources the robot UI offers (vitulus_ui, served as /api/map_sources). One entry per MapProxy layer in mapproxy.yaml: layer/grid/format must match it (the tile URL is /wmts/<layer>/<grid>/{z}/{x}/{y}.<format>). kind base = one at a time under the map, overlay = independent transparent layer on top. group (bases): photo = aerial/satellite imagery, map = drawn maps; the UI lists the bases in these two groups. id is the stable key of the browser settings and of the alignment offset (offset_key: layers that share one georeference share one offset). max_zoom = finest level worth fetching (the real level of the source; the UI magnifies beyond it), min_zoom = the source draws nothing below it. attribution: a string, or {en, cs} when it has words. layer_order (overlays): under = a tone right above the background map and UNDER the robot maps (relief, slope), over = lines ON TOP of the robot maps (cadastre, contours, buildings).",
   "version": 1,
   "default_base": "sat",
   "sources": [
     {
-      "id": "sat", "kind": "base", "layer": "gm_layer", "grid": "gm_grid", "format": "png",
+      "id": "sat", "kind": "base", "group": "photo", "layer": "gm_layer", "grid": "gm_grid", "format": "png",
       "name": {"en": "Satellite (Google)", "cs": "Satelit (Google)"},
       "max_zoom": 21, "attribution": {"en": "Imagery © Google", "cs": "Snímky © Google"}
     },
     {
-      "id": "cuzk", "kind": "base", "layer": "cuzk_layer", "grid": "gm_grid", "format": "png",
-      "name": {"en": "Orthophoto ČÚZK", "cs": "Ortofoto ČÚZK"},
-      "max_zoom": 21, "attribution": {"en": "© ČÚZK (open data)", "cs": "© ČÚZK, otevřená data"}
+      "id": "sat_hybrid", "kind": "base", "group": "photo", "layer": "gm_hybrid_layer", "grid": "gm_grid", "format": "jpeg",
+      "name": {"en": "Satellite with names (Google)", "cs": "Satelit s popisky (Google)"},
+      "max_zoom": 21, "attribution": {"en": "Imagery, map data © Google", "cs": "Snímky, mapová data © Google"}, "offset_key": "sat"
     },
     {
-      "id": "ztm", "kind": "base", "layer": "cuzk_ztm_layer", "grid": "gm_grid", "format": "jpeg",
+      "id": "cuzk", "kind": "base", "group": "photo", "layer": "cuzk_ortho_layer", "grid": "gm_grid", "format": "jpeg",
+      "name": {"en": "Orthophoto ČÚZK", "cs": "Ortofoto ČÚZK"},
+      "max_zoom": 20, "attribution": {"en": "© ČÚZK (open data)", "cs": "© ČÚZK, otevřená data"}
+    },
+    {
+      "id": "esri", "kind": "base", "group": "photo", "layer": "esri_layer", "grid": "gm_grid", "format": "jpeg",
+      "name": {"en": "World Imagery (Esri)", "cs": "Letecké snímky (Esri)"},
+      "max_zoom": 18, "attribution": "Imagery © Esri, Maxar, Earthstar Geographics"
+    },
+    {
+      "id": "bing", "kind": "base", "group": "photo", "layer": "bing_layer", "grid": "gm_grid", "format": "jpeg",
+      "name": {"en": "Aerial (Bing)", "cs": "Letecké snímky (Bing)"},
+      "max_zoom": 19, "attribution": {"en": "Imagery © Microsoft", "cs": "Snímky © Microsoft"}
+    },
+    {
+      "id": "gmap", "kind": "base", "group": "map", "layer": "gm_map_layer", "grid": "gm_grid", "format": "png",
+      "name": {"en": "Map (Google)", "cs": "Mapa (Google)"},
+      "max_zoom": 21, "attribution": {"en": "Map data © Google", "cs": "Mapová data © Google"}, "offset_key": "sat"
+    },
+    {
+      "id": "ztm", "kind": "base", "group": "map", "layer": "cuzk_ztm_layer", "grid": "gm_grid", "format": "jpeg",
       "name": {"en": "Topographic map ČÚZK (ZTM)", "cs": "Topografická mapa ČÚZK (ZTM)"},
       "max_zoom": 19, "attribution": {"en": "© ČÚZK (open data)", "cs": "© ČÚZK, otevřená data"}, "offset_key": "cuzk"
     },
     {
-      "id": "otm", "kind": "base", "layer": "otm_layer", "grid": "gm_grid", "format": "png",
+      "id": "otm", "kind": "base", "group": "map", "layer": "otm_layer", "grid": "gm_grid", "format": "png",
       "name": {"en": "OpenTopoMap", "cs": "OpenTopoMap"},
       "max_zoom": 17, "attribution": "© OpenStreetMap contributors, SRTM · © OpenTopoMap (CC-BY-SA)", "offset_key": "osm"
     },
     {
-      "id": "osm", "kind": "base", "layer": "osm_demo", "grid": "webmercator", "format": "png",
+      "id": "osm", "kind": "base", "group": "map", "layer": "osm_demo", "grid": "webmercator", "format": "png",
       "name": {"en": "OpenStreetMap", "cs": "OpenStreetMap"},
       "max_zoom": 19, "attribution": "© OpenStreetMap contributors"
     },
     {
       "id": "kn", "kind": "overlay", "layer": "cuzk_kn_layer", "grid": "gm_grid", "format": "png",
       "name": {"en": "Cadastre (parcels)", "cs": "Katastr (parcely)"},
+      "min_zoom": 16, "max_zoom": 20, "default_opacity": 0.85, "layer_order": "over",
+      "attribution": {"en": "© ČÚZK (open data)", "cs": "© ČÚZK, otevřená data"}, "offset_key": "cuzk"
+    },
+    {
+      "id": "ruian", "kind": "overlay", "layer": "cuzk_ruian_layer", "grid": "gm_grid", "format": "png",
+      "name": {"en": "Buildings, house numbers (RÚIAN)", "cs": "Budovy, čísla domů (RÚIAN)"},
       "min_zoom": 16, "max_zoom": 20, "default_opacity": 0.85, "layer_order": "over",
       "attribution": {"en": "© ČÚZK (open data)", "cs": "© ČÚZK, otevřená data"}, "offset_key": "cuzk"
     },
@@ -42,8 +68,14 @@
     },
     {
       "id": "hillshade", "kind": "overlay", "layer": "cuzk_hillshade_layer", "grid": "gm_grid", "format": "jpeg",
-      "name": {"en": "Shaded relief (DMR 5G)", "cs": "Stínovaný reliéf (DMR 5G)"},
+      "name": {"en": "Shaded relief (DMR\u00a05G)", "cs": "Stínovaný reliéf (DMR\u00a05G)"},
       "max_zoom": 19, "default_opacity": 0.5, "layer_order": "under",
+      "attribution": {"en": "© ČÚZK (open data)", "cs": "© ČÚZK, otevřená data"}, "offset_key": "cuzk"
+    },
+    {
+      "id": "slope", "kind": "overlay", "layer": "cuzk_slope_layer", "grid": "gm_grid", "format": "jpeg",
+      "name": {"en": "Slope (DMR\u00a05G)", "cs": "Sklon terénu (DMR\u00a05G)"},
+      "min_zoom": 14, "max_zoom": 19, "default_opacity": 0.45, "layer_order": "under",
       "attribution": {"en": "© ČÚZK (open data)", "cs": "© ČÚZK, otevřená data"}, "offset_key": "cuzk"
     }
   ]

@@ -13,3 +13,4 @@ web/index.html
 *_bak_*
 *.orig
 .claude/
+mapproxy_configuration/seed_area.wkt

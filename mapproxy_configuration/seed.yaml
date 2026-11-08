@@ -1,35 +1,60 @@
-# ---------------------------------------
-# MapProxy example seeding configuration.
-# ---------------------------------------
+# Seeding of the robot's surroundings (Vitulus) — fills the caches of a small
+# square around the site in advance, so the map has the photos offline in the
+# garden and the first view is instant.
 #
-# This is a minimal MapProxy seeding configuration.
-# See full_seed_example.yaml and the documentation for more options.
+# Run it ONLY through scripts/seed_garden.sh: it writes the area file
+# seed_area.wkt (next to this file, NOT in git: the site position is private)
+# from the robot's own map datum and runs mapproxy-seed with ONE request at a
+# time. Default is a dry run (counts only) of the task garden_cuzk (open
+# data); the commercial tasks run only when named with --tasks:
 #
+#     scripts/seed_garden.sh                       # dry run, garden_cuzk
+#     scripts/seed_garden.sh --go                  # fetch garden_cuzk
+#     scripts/seed_garden.sh --tasks garden_photo_esri   # dry run of another task
+#
+# 400 x 400 m (half side 200 m) is about 430 tiles per layer for z14-z20.
+# z21 is not seeded (about 1100 more tiles per layer; the UI magnifies z20).
+#
+# Not here on purpose: OpenStreetMap and OpenTopoMap (their tile usage
+# policies forbid bulk downloading).
+
+coverages:
+  garden:
+    # POLYGON in EPSG:4326 (lon lat), written by scripts/seed_garden.sh
+    datasource: 'seed_area.wkt'
+    srs: 'EPSG:4326'
 
 seeds:
-  hillshade_boundary:
-    caches: [hillshade_cache]
-    # grids: []
-    # coverages: []
+  # CUZK open data (CC BY 4.0, no limits beyond "no excessive load")
+  garden_cuzk:
+    caches: [cuzk_wm_cache, cuzk_ztm_cache, cuzk_hillshade_cache, cuzk_slope_cache,
+             cuzk_kn_cache, cuzk_contours_cache, cuzk_ruian_cache]
+    coverages: [garden]
     levels:
-      from: 6
-      to: 15
-
-
-
-  srtm_seed:
-    caches: [srtm_cache]
-    # grids: []
-    # coverages: []
-    levels:
-      from: 6
+      from: 14
       to: 20
-
-  airports_seed:
-    caches: [airports_cache]
-    # grids: []
-    # coverages: []
+    # the orthophoto is re-flown every 2 years: refresh tiles older than a year
+    refresh_before:
+      weeks: 52
+  # commercial photo bases (Google, Esri, Bing): their terms do not allow
+  # caching; seeding them is the owner's call (decision D40) — run this task
+  # only when asked. Levels stop at each source's real level (the caches
+  # upscale beyond it).
+  garden_photo_google:
+    caches: [gm_cache, gm_hybrid_cache]
+    coverages: [garden]
     levels:
-      from: 6
+      from: 14
       to: 20
-
+  garden_photo_esri:
+    caches: [esri_cache]
+    coverages: [garden]
+    levels:
+      from: 14
+      to: 18
+  garden_photo_bing:
+    caches: [bing_cache]
+    coverages: [garden]
+    levels:
+      from: 14
+      to: 19

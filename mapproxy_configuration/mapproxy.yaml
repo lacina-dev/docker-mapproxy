@@ -23,12 +23,22 @@ layers:
   - name: osm_demo      # access in JOSM as TMS: http://localhost:8080/tiles/1.0.0/osm_demo/webmercator/{zoom}/{x}/{y}.png
     title: Open Streetmap Tiles (test)
     sources: [osm_cache]
+  # gm_layer: Google satellite, UNCHANGED (cache gm_cache, PNG URL). Its
+  # files on the robot are named *.png but hold the JPEG Google sends (MapProxy
+  # stores a source tile as received); switching the cache to image/jpeg would
+  # look for *.jpeg and lose the warm offline cache of the default base map.
   - name: gm_layer
     title: Test of using GM tiles
     sources: [ gm_cache ]
+  # cuzk_layer: the OLD PNG URL of the CUZK orthophoto (pages opened before
+  # an update, the UI's built-in fallback list, JOSM/QGIS bookmarks). Since
+  # 2026-11-08 it reads the JPEG cache of cuzk_ortho_layer, stores nothing: a
+  # tile already in that cache goes out as is (JPEG bytes, Content-Type
+  # image/png; browsers decode by content), only a missing one is fetched and
+  # re-encoded to PNG.
   - name: cuzk_layer
-    title: CUZK ortofoto CR (12.5 cm, free WMS, no key)
-    sources: [ cuzk_cache ]
+    title: CUZK ortofoto CR (legacy PNG URL of cuzk_ortho_layer)
+    sources: [ cuzk_png_compat ]
   # ---- added 2026-11-08 (map sources for the robot UI) -------------------
   # The UI lists these from ui_sources.json (same directory): keep the two in
   # step ("layer" there = name here). All on gm_grid (EPSG:3857, origin ul,
@@ -49,6 +59,34 @@ layers:
   - name: cuzk_hillshade_layer
     title: CUZK DMR 5G shaded relief (overlay, opaque grey - use with opacity)
     sources: [cuzk_hillshade_cache]
+  # ---- added 2026-11-08, batch M1 ------------------------------------------
+  # New photo base maps, JPEG caches (the servers send JPEG: stored as
+  # received, *.jpeg files). Google, Esri and Bing serve these tiles under
+  # their own terms (no API key, no cache allowed by their terms); kept on the
+  # owner's decision D40 (private robot, few tiles, risk accepted). The CUZK
+  # layers are open data (CC BY 4.0).
+  - name: gm_hybrid_layer
+    title: Google hybrid - satellite with roads and names (JPEG)
+    sources: [gm_hybrid_cache]
+  - name: gm_map_layer
+    title: Google map (PNG)
+    sources: [gm_map_cache]
+  - name: esri_layer
+    title: Esri World Imagery (JPEG, real levels up to z18 here)
+    sources: [esri_cache]
+  - name: bing_layer
+    title: Bing Aerial (JPEG, real levels up to z19 here)
+    sources: [bing_cache]
+  - name: cuzk_ortho_layer
+    title: CUZK ortofoto CR, pre-rendered Web Mercator tiles (JPEG, z20)
+    sources: [cuzk_wm_cache]
+  # overlays
+  - name: cuzk_slope_layer
+    title: CUZK DMR 5G slope (overlay, opaque colour - use with opacity)
+    sources: [cuzk_slope_cache]
+  - name: cuzk_ruian_layer
+    title: CUZK RUIAN buildings and house numbers (overlay)
+    sources: [cuzk_ruian_cache]
 
 
 caches:
@@ -58,18 +96,60 @@ caches:
     format: image/png
     grids: [webmercator]
   gm_cache:
+    # format left at the default (image/png) on purpose: see layer gm_layer
     grids: [ gm_grid ]
     sources: [ gm ]
     cache:
       type: file
       directory_layout: tms
-  cuzk_cache:
+  # legacy PNG URL (layer cuzk_layer), never stored (meta_size 1x1: one tile
+  # in = one tile out; the 4x4 default would pull 36 tiles from the source
+  # for every single legacy request)
+  cuzk_png_compat:
     grids: [ gm_grid ]
-    sources: [ cuzk ]
+    sources: [ cuzk_wm_cache ]
     format: image/png
-    cache:
-      type: file
-      directory_layout: tms
+    disable_storage: true
+    meta_size: [1, 1]
+    meta_buffer: 0
+  # CUZK orthophoto from the server's pre-rendered Web Mercator tiles (same
+  # picture as the old WMS, alignment offset 'cuzk' still valid). New
+  # directory: the old WMS cache 'cuzk_cache_EPSG900913' is not read any more;
+  # the site is filled again by the open-data seed (seed.yaml, garden_cuzk)
+  # or on the first view.
+  cuzk_wm_cache:
+    grids: [ gm_grid ]
+    sources: [ cuzk_wm ]
+    format: image/jpeg
+    # the server has z0-z20 (404 above): z21 is upscaled from z20
+    upscale_tiles: 1
+    cache: {type: file, directory_layout: tms}
+  gm_hybrid_cache:
+    grids: [ gm_grid ]
+    sources: [ gm_hybrid ]
+    format: image/jpeg
+    cache: {type: file, directory_layout: tms}
+  gm_map_cache:
+    grids: [ gm_grid ]
+    sources: [ gm_map ]
+    # a drawn map with text: PNG keeps the lines sharp (Google sends PNG)
+    format: image/png
+    cache: {type: file, directory_layout: tms}
+  esri_cache:
+    grids: [ gm_grid ]
+    sources: [ esri ]
+    format: image/jpeg
+    # z19+ answers a grey "Map data not yet available" tile here, never cache
+    # that: finer levels are upscaled from z18
+    upscale_tiles: 3
+    cache: {type: file, directory_layout: tms}
+  bing_cache:
+    grids: [ gm_grid ]
+    sources: [ bing ]
+    format: image/jpeg
+    # z20+ answers a "no tile" placeholder here: finer levels upscaled from z19
+    upscale_tiles: 2
+    cache: {type: file, directory_layout: tms}
   cuzk_ztm_cache:
     grids: [ gm_grid ]
     sources: [ cuzk_ztm ]
@@ -100,6 +180,24 @@ caches:
     sources: [ cuzk_hillshade ]
     format: image/jpeg
     cache: {type: file, directory_layout: tms}
+  cuzk_slope_cache:
+    grids: [ gm_grid ]
+    sources: [ cuzk_slope ]
+    format: image/jpeg
+    # minimize_meta_requests: only for WMS GetMap requests TO MapProxy (one
+    # source request for the asked area instead of every meta tile it
+    # touches). Tile requests (WMTS/TMS, the robot UI) still render the whole
+    # 4x4 meta tile (+ buffer) per uncached tile.
+    minimize_meta_requests: true
+    cache: {type: file, directory_layout: tms}
+  cuzk_ruian_cache:
+    grids: [ gm_grid ]
+    sources: [ cuzk_ruian ]
+    format: image/png
+    minimize_meta_requests: true   # WMS clients only, see cuzk_slope_cache
+    # empty (fully transparent) tiles share one file
+    link_single_color_images: true
+    cache: {type: file, directory_layout: tms}
 
 
 sources:
@@ -113,9 +211,10 @@ sources:
     url: http://mt0.google.com/vt/lyrs=s@0&hl=en&x=%(x)s&y=%(y)s&z=%(z)s
     grid: gm_grid
   cuzk:
-    # CUZK ortofoto CR — official Czech orthophoto, ~12.5 cm, refreshed on a
-    # 2-year cycle, free WMS without an API key. Verified 2026-08-01: serves
-    # EPSG:3857 directly (no reprojection needed).
+    # NOT USED since 2026-11-08 (cuzk_wm, the server's ready tiles, replaced
+    # it); kept for a quick rollback. CUZK ortofoto CR — official Czech
+    # orthophoto, ~12.5 cm, refreshed on a 2-year cycle, free WMS without an
+    # API key. Verified 2026-08-01: serves EPSG:3857 directly.
     type: wms
     supported_srs: ['EPSG:3857']
     req:
@@ -124,23 +223,27 @@ sources:
       transparent: false
   # ---- added 2026-11-08 ---------------------------------------------------
   # CUZK sources: (c) CUZK, open data, no key. OpenTopoMap: CC-BY-SA, no key,
-  # credit required. Tiles verified 2026-11-08 at the site (50.0187 N,
-  # 14.9033 E). Not added: Esri World Imagery (licence terms unclear for this
-  # use) and the CUZK orthophoto ARCHIVE WMS (answers non-browser clients with
-  # a redirect to its terms page).
+  # credit required. Tiles verified 2026-11-08 at the robot's site. Not added:
+  # the CUZK orthophoto ARCHIVE WMS (answers non-browser clients with a
+  # redirect to its terms page).
   cuzk_ztm:
     # cached Web Mercator tiles of the CUZK ArcGIS server (ArcGIS order z/y/x)
     type: tile
     url: https://ags.cuzk.cz/arcgis1/rest/services/ZTM_WM/MapServer/tile/%(z)s/%(y)s/%(x)s
     grid: gm_grid
-    # finest level the server has: z19 of gm_grid (0.2986 m/px)
-    max_res: 0.2985821417389697
+    # finest level the server has: z19 of gm_grid (0.2986 m/px). max_res sits
+    # BELOW the level resolution: at exactly 0.29858... float rounding counted
+    # z19 itself as out of range and served z18 upscaled (found 2026-11-08)
+    max_res: 0.25
   otm:
     type: tile
     url: https://a.tile.opentopomap.org/%(z)s/%(x)s/%(y)s.png
     grid: gm_grid
-    # finest real level: z17 of gm_grid (1.194 m/px)
-    max_res: 1.1943285668550503
+    # finest real level: z17 of gm_grid (1.194 m/px). Below the level value
+    # for the float reason measured on cuzk_ztm (there the exact value served
+    # z19 upscaled from z18); with 1.0 a z17 request stores a z17 tile
+    # (checked 2026-11-08 in a local container).
+    max_res: 1.0
     http:
       headers:
         User-Agent: 'Vitulus-robot-MapProxy/1.16 (private garden robot)'
@@ -168,6 +271,70 @@ sources:
       url: https://ags.cuzk.cz/arcgis2/services/dmr5g/ImageServer/WMSServer
       layers: 'dmr5g:GrayscaleHillshade'
       transparent: false
+  # ---- added 2026-11-08, batch M1 ------------------------------------------
+  # concurrent_requests: at most N parallel requests to that server PER
+  # MapProxy process. The robot runs 16-20 uWSGI processes (CHEAPER=16 kept,
+  # PROCESSES=20 max), so the real ceiling is N x 16-20: N = 1 everywhere
+  # (tile servers: one tile = one fast GET; WMS: each request renders a 4x4
+  # meta tile on the CUZK server). 4 would allow up to 80 at once.
+  gm_hybrid:
+    type: tile
+    url: https://mt0.google.com/vt/lyrs=y&hl=en&x=%(x)s&y=%(y)s&z=%(z)s
+    grid: gm_grid
+    concurrent_requests: 1
+  gm_map:
+    type: tile
+    url: https://mt0.google.com/vt/lyrs=m&hl=en&x=%(x)s&y=%(y)s&z=%(z)s
+    grid: gm_grid
+    concurrent_requests: 1
+  esri:
+    # Esri World Imagery (ArcGIS tile order z/y/x)
+    type: tile
+    url: https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/%(z)s/%(y)s/%(x)s
+    grid: gm_grid
+    # finest real level at the site: z18 of gm_grid (0.597 m/px); max_res
+    # below the level value (see cuzk_ztm)
+    max_res: 0.5
+    concurrent_requests: 1
+  bing:
+    # Bing Maps aerial (quadkey addressing, gm_grid origin ul = Bing's)
+    type: tile
+    url: https://ecn.t0.tiles.virtualearth.net/tiles/a%(quadkey)s.jpeg?g=1
+    grid: gm_grid
+    # finest real level at the site: z19 of gm_grid (0.299 m/px); max_res
+    # below the level value (see cuzk_ztm)
+    max_res: 0.25
+    concurrent_requests: 1
+  cuzk_wm:
+    # CUZK Ortofoto CR as cached Web Mercator tiles (ArcGIS order z/y/x),
+    # 12.5 cm, open data CC BY 4.0. Replaces the WMS 'cuzk' below: no
+    # rendering on the server, smaller JPEG tiles, identical picture.
+    type: tile
+    url: https://ags.cuzk.cz/arcgis1/rest/services/ORTOFOTO_WM/MapServer/tile/%(z)s/%(y)s/%(x)s
+    grid: gm_grid
+    # finest level the server has: z20 of gm_grid (0.149 m/px); max_res
+    # below the level value (see cuzk_ztm)
+    max_res: 0.12
+    concurrent_requests: 1
+  cuzk_slope:
+    # DMR 5G terrain slope, colour (yellow-orange-red = steeper), 2 m pixels
+    type: wms
+    supported_srs: ['EPSG:3857']
+    concurrent_requests: 1
+    req:
+      url: https://ags.cuzk.cz/arcgis2/services/dmr5g/ImageServer/WMSServer
+      layers: 'dmr5g:SlopeRGBMap'
+      transparent: false
+  cuzk_ruian:
+    # RUIAN building outlines (StavebniObjekt, drawn from about z16) and
+    # address points with house numbers (AdresniMisto, from about z18)
+    type: wms
+    supported_srs: ['EPSG:3857']
+    concurrent_requests: 1
+    req:
+      url: https://ags.cuzk.cz/arcgis/services/RUIAN/MapServer/WMSServer
+      layers: 'StavebniObjekt,AdresniMisto'
+      transparent: true
 
 
 grids:

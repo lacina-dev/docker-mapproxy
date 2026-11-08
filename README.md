@@ -214,12 +214,38 @@ mounted from this repo and starts MapProxy with `reloader=True`, so a saved
   Without an argument it checks the live file.
 * **Zoom limits.** Sources with fewer levels than `gm_grid` (z0–z21) carry
   `max_res` and their cache `upscale_tiles`, so finer levels are upscaled
-  instead of fetched: OpenTopoMap z17, ČÚZK ZTM z19 (the OSM `webmercator`
-  grid ends at z19 itself).
+  instead of fetched: OpenTopoMap z17, Esri z18, ČÚZK ZTM and Bing z19, ČÚZK
+  orthophoto z20 (the OSM `webmercator` grid ends at z19 itself). Put
+  `max_res` a little BELOW the resolution of the last real level (e.g. 0.25
+  for z19 = 0.2986 m/px): the exact value is lost to float rounding and the
+  last real level is then served upscaled from the one above.
+* **Formats.** New photo caches are JPEG (stored as the server sends them),
+  drawn maps and transparent overlays PNG. `gm_layer` (Google satellite, the
+  default base) is unchanged: its cache is format PNG and its files are
+  named `*.png`, but hold the JPEG Google sends — switching it to JPEG would
+  lose the warm offline cache. `cuzk_layer` is the old PNG URL of
+  `cuzk_ortho_layer` (nothing stored): a tile already in that JPEG cache goes
+  out as is (JPEG bytes, Content-Type `image/png`; browsers decode by
+  content), only a missing one is fetched and re-encoded to PNG.
+* **CUZK orthophoto cache.** Since 2026-11-08 the orthophoto comes from the
+  server's ready tiles (`cuzk_wm_cache`, JPEG); the old WMS cache
+  `cache_data/cuzk_cache_EPSG900913` is no longer read. The site fills again
+  on the first view or with the open-data seed (`garden_cuzk` below); the old
+  directory can then be deleted.
+* **Terms.** ČÚZK layers are open data (CC BY 4.0). Google, Esri and Bing
+  tiles are used without an API key and cached against their terms, on the
+  owner's decision (D40, private robot, few tiles); OSM/OpenTopoMap must not
+  be bulk-downloaded (not in `seed.yaml`).
+* **Seeding the site.** `scripts/seed_garden.sh` writes a square around the
+  robot's map datum (from the UI's `/api/datum`) to
+  `mapproxy_configuration/seed_area.wkt` (not in git: the position is
+  private) and runs the tasks of `seed.yaml` with one request at a time. Dry
+  run by default; `--go` fetches; `--tasks` picks (default `garden_cuzk`,
+  open data only).
 * **Cache cleanup.** `mapproxy_configuration/cleanup.yaml` removes tiles older
-  than 90 days from the online caches (OSM, OpenTopoMap, ZTM, cadastre,
-  contours, relief); the satellite (`gm_cache`) and orthophoto (`cuzk_cache`)
-  caches are kept. `scripts/cache_cleanup.sh` runs it in the container
+  than 90 days from the online caches (OSM, OpenTopoMap, ZTM, Google map,
+  cadastre, contours, relief, slope, buildings); the photo caches (Google
+  satellite/hybrid, Esri, Bing, ČÚZK orthophoto) are kept. `scripts/cache_cleanup.sh` runs it in the container
   (`--dry-run` / `--summary` pass through). Weekly via a systemd **user** timer
   (no root, logged in the user journal, catches up after downtime):
 
