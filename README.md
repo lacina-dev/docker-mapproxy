@@ -212,11 +212,22 @@ mounted from this repo and starts MapProxy with `reloader=True`, so a saved
   It validates with the container's own MapProxy (YAML, options, references,
   service set-up) and checks that every layer of `ui_sources.json` exists.
   Without an argument it checks the live file.
+* **uWSGI settings.** `mapproxy_configuration/uwsgi.robot.ini` is written to
+  `/settings/uwsgi.ini` by `scripts/start.sh` on every container start
+  (envsubst, the same variables as the image's `build_data/uwsgi.ini`), so a
+  change needs only a restart: `docker restart docker-mapproxy-mapproxy-1`.
+  T17 M9-3: workers restart after a day / 20000 requests instead of an hour /
+  1000 (with 16–20 workers that was one restart about every 3 minutes);
+  `reload-on-rss` 512 MB (was 2048; a worker uses ~50 MB) is the memory guard.
+  Single mode only (the robot, `MULTI_MAPPROXY=false`); not named `uwsgi.ini`,
+  which the image would copy without envsubst.
 * **Zoom limits.** Sources with fewer levels than `gm_grid` (z0–z21) carry
   `max_res` and their cache `upscale_tiles`, so finer levels are upscaled
   instead of fetched: OpenTopoMap z17, Esri and its Wayback releases z18,
   the M6 DMR 5G / DMP 1G renderings z18 (2 m data), the CENIA 1950s
-  orthophoto z18 (0.5 m data), ČÚZK ZTM and Bing z19
+  orthophoto z18 (0.5 m data), ČÚZK ZTM and Bing z19, Google satellite and
+  hybrid z20 (T17 M9-2: their z21 measured no more detail than z20, also over
+  the garden; z21 is upscaled from z20, `ui_sources.json` `native_zoom` 20)
   (the OSM `webmercator` grid ends at z19 itself). The ČÚZK orthophoto tiles end
   at z20; its z21 comes from the ČÚZK WMS (see "CUZK orthophoto cache"). Put
   `max_res` a little BELOW the resolution of the last real level (e.g. 0.25

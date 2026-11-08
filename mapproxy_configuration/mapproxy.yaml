@@ -134,6 +134,11 @@ caches:
     # format left at the default (image/png) on purpose: see layer gm_layer
     grids: [ gm_grid ]
     sources: [ gm ]
+    # T17 M9-2: Google's z21 holds no more detail than z20 (map_audit2.md
+    # 1.1: edge energy z21/z20 1.10-1.17, also over the garden), so z21 is
+    # made from the cached z20 tile (source max_res) instead of 4 more
+    # requests to Google; tiles already in the cache stay as they are
+    upscale_tiles: 1
     cache:
       type: file
       directory_layout: tms
@@ -209,6 +214,7 @@ caches:
     grids: [ gm_grid ]
     sources: [ gm_hybrid ]
     format: image/jpeg
+    upscale_tiles: 1   # T17 M9-2, as gm_cache
     cache: {type: file, directory_layout: tms}
   gm_map_cache:
     grids: [ gm_grid ]
@@ -375,6 +381,9 @@ sources:
     type: tile
     url: http://mt0.google.com/vt/lyrs=s@0&hl=en&x=%(x)s&y=%(y)s&z=%(z)s
     grid: gm_grid
+    # T17 M9-2: finest real level z20 of gm_grid (0.149 m/px); max_res below
+    # the level value (see cuzk_ztm); z21 is upscaled from z20 (gm_cache)
+    max_res: 0.12
   cuzk:
     # CUZK ortofoto CR — official Czech orthophoto, ~12.5 cm, refreshed on a
     # 2-year cycle, free WMS without an API key. Verified 2026-08-01: serves
@@ -477,6 +486,7 @@ sources:
     type: tile
     url: https://mt0.google.com/vt/lyrs=y&hl=en&x=%(x)s&y=%(y)s&z=%(z)s
     grid: gm_grid
+    max_res: 0.12   # T17 M9-2, as gm
     concurrent_requests: 1
   gm_map:
     type: tile

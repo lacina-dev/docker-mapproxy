@@ -139,6 +139,14 @@ if [ "$1" = '/scripts/run_develop_server.sh' ] || [ "$1" = '/scripts/start.sh' ]
 
     # Entrypoint logic to start the app
     if [[ ${PRODUCTION} =~ [Tt][Rr][Uu][Ee] ]] && [[ ${MULTI_MAPPROXY} =~ [Ff][Aa][Ll][Ss][Ee] ]]; then
+        # T17 M9-3: the repo's uwsgi.robot.ini (mapproxy_configuration, mounted
+        # at CONFIG_DATA_PATH) wins on every start; uwsgi_config below only
+        # writes /settings/uwsgi.ini when it is missing, i.e. once per container.
+        # Not uwsgi.ini: env-data.sh would copy that one without envsubst.
+        if [[ -f "${CONFIG_DATA_PATH}/uwsgi.robot.ini" ]]; then
+            export CONFIG_DATA_PATH PROCESSES CHEAPER THREADS MAPPROXY_USER_ID MAPPROXY_GROUP_ID MAPPROXY_APP_DIR DISABLE_LOGGING LOG4XX LOG5XX
+            envsubst < "${CONFIG_DATA_PATH}/uwsgi.robot.ini" > /settings/uwsgi.ini
+        fi
         uwsgi_config "${CONFIG_DATA_PATH}"
         make_logs
         ###
