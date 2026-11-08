@@ -1,0 +1,50 @@
+{
+  "_comment": "Map sources the robot UI offers (vitulus_ui, served as /api/map_sources). One entry per MapProxy layer in mapproxy.yaml: layer/grid/format must match it (the tile URL is /wmts/<layer>/<grid>/{z}/{x}/{y}.<format>). kind base = one at a time under the map, overlay = independent transparent layer on top. id is the stable key of the browser settings and of the alignment offset (offset_key: layers that share one georeference share one offset). max_zoom = finest level worth fetching, min_zoom = the source draws nothing below it. attribution: a string, or {en, cs} when it has words. layer_order (overlays): under = a tone right above the background map and UNDER the robot maps (relief), over = lines ON TOP of the robot maps (cadastre, contours).",
+  "version": 1,
+  "default_base": "sat",
+  "sources": [
+    {
+      "id": "sat", "kind": "base", "layer": "gm_layer", "grid": "gm_grid", "format": "png",
+      "name": {"en": "Satellite (Google)", "cs": "Satelit (Google)"},
+      "max_zoom": 21, "attribution": {"en": "Imagery © Google", "cs": "Snímky © Google"}
+    },
+    {
+      "id": "cuzk", "kind": "base", "layer": "cuzk_layer", "grid": "gm_grid", "format": "png",
+      "name": {"en": "Orthophoto ČÚZK", "cs": "Ortofoto ČÚZK"},
+      "max_zoom": 21, "attribution": {"en": "© ČÚZK (open data)", "cs": "© ČÚZK, otevřená data"}
+    },
+    {
+      "id": "ztm", "kind": "base", "layer": "cuzk_ztm_layer", "grid": "gm_grid", "format": "jpeg",
+      "name": {"en": "Topographic map ČÚZK (ZTM)", "cs": "Topografická mapa ČÚZK (ZTM)"},
+      "max_zoom": 19, "attribution": {"en": "© ČÚZK (open data)", "cs": "© ČÚZK, otevřená data"}, "offset_key": "cuzk"
+    },
+    {
+      "id": "otm", "kind": "base", "layer": "otm_layer", "grid": "gm_grid", "format": "png",
+      "name": {"en": "OpenTopoMap", "cs": "OpenTopoMap"},
+      "max_zoom": 17, "attribution": "© OpenStreetMap contributors, SRTM · © OpenTopoMap (CC-BY-SA)", "offset_key": "osm"
+    },
+    {
+      "id": "osm", "kind": "base", "layer": "osm_demo", "grid": "webmercator", "format": "png",
+      "name": {"en": "OpenStreetMap", "cs": "OpenStreetMap"},
+      "max_zoom": 19, "attribution": "© OpenStreetMap contributors"
+    },
+    {
+      "id": "kn", "kind": "overlay", "layer": "cuzk_kn_layer", "grid": "gm_grid", "format": "png",
+      "name": {"en": "Cadastre (parcels)", "cs": "Katastr (parcely)"},
+      "min_zoom": 16, "max_zoom": 20, "default_opacity": 0.85, "layer_order": "over",
+      "attribution": {"en": "© ČÚZK (open data)", "cs": "© ČÚZK, otevřená data"}, "offset_key": "cuzk"
+    },
+    {
+      "id": "contours", "kind": "overlay", "layer": "cuzk_contours_layer", "grid": "gm_grid", "format": "png",
+      "name": {"en": "Contour lines", "cs": "Vrstevnice"},
+      "min_zoom": 16, "max_zoom": 19, "default_opacity": 0.8, "layer_order": "over",
+      "attribution": {"en": "© ČÚZK (open data)", "cs": "© ČÚZK, otevřená data"}, "offset_key": "cuzk"
+    },
+    {
+      "id": "hillshade", "kind": "overlay", "layer": "cuzk_hillshade_layer", "grid": "gm_grid", "format": "jpeg",
+      "name": {"en": "Shaded relief (DMR 5G)", "cs": "Stínovaný reliéf (DMR 5G)"},
+      "max_zoom": 19, "default_opacity": 0.5, "layer_order": "under",
+      "attribution": {"en": "© ČÚZK (open data)", "cs": "© ČÚZK, otevřená data"}, "offset_key": "cuzk"
+    }
+  ]
+}

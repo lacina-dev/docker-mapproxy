@@ -1,0 +1,8 @@
+[Unit]
+Description=MapProxy: remove online-source tiles older than 90 days (docker-mapproxy)
+
+[Service]
+Type=oneshot
+ExecStart=%h/catkin_ws/src/docker-mapproxy/scripts/cache_cleanup.sh
+Nice=10
+IOSchedulingClass=idle

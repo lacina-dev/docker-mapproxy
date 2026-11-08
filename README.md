@@ -10,6 +10,7 @@
        * [docker-compose](#docker-compose)
            * [Reverse proxy](#reverse-proxy)
            * [S3 storage backend](#s3-storage-backend)
+   * [Vitulus robot: map sources, config check, cache cleanup](#vitulus-robot-map-sources-config-check-cache-cleanup)
    * [Support](#support)
    * [Credits](#credits)
 
@@ -188,6 +189,43 @@ MinIO can be accessed from `http://localhost:9001` or using the minio api endpoi
 Note that the MinIO service does not support subpaths or routes on the web server and any reverse proxy will need to be implemented at the web root, using a dedicated subdomain. Note as well that MinIO provides a Console (web-ui), and an API endpoint as distinct services which serve different functions... api calls to the console will return errors.
 
 You can use this methodology to serve as a proxy for other storage solutions, for example, using MinIO as a [proxy for Microsoft Azure Blob Storage](https://cloudblogs.microsoft.com/opensource/2017/11/09/s3cmd-amazon-s3-compatible-apps-azure-storage/).
+
+## Vitulus robot: map sources, config check, cache cleanup
+
+This fork serves the map layers of the Vitulus mower UI (port 8082). The
+container runs from `docker-compose-build.yml` (`docker compose -f
+docker-compose-build.yml up -d --no-build mapproxy`); `scripts/start.sh` is
+mounted from this repo and starts MapProxy with `reloader=True`, so a saved
+`mapproxy_configuration/mapproxy.yaml` goes live at once.
+
+* **Layers and the UI list.** Every layer the robot UI offers is listed in
+  `mapproxy_configuration/ui_sources.json` (id, `layer` = the MapProxy layer
+  name, grid, format, kind `base`/`overlay`, en/cs names, zoom range, credit,
+  `layer_order` of overlays). A new source = a layer in `mapproxy.yaml` + an
+  entry there; the UI needs no change.
+* **Check before saving** (a broken file takes every layer down):
+
+      cp mapproxy_configuration/mapproxy.yaml /tmp/mapproxy.yaml   # edit the copy
+      scripts/check_mapproxy_yaml.sh /tmp/mapproxy.yaml && \
+          cp /tmp/mapproxy.yaml mapproxy_configuration/mapproxy.yaml
+
+  It validates with the container's own MapProxy (YAML, options, references,
+  service set-up) and checks that every layer of `ui_sources.json` exists.
+  Without an argument it checks the live file.
+* **Zoom limits.** Sources with fewer levels than `gm_grid` (z0–z21) carry
+  `max_res` and their cache `upscale_tiles`, so finer levels are upscaled
+  instead of fetched: OpenTopoMap z17, ČÚZK ZTM z19 (the OSM `webmercator`
+  grid ends at z19 itself).
+* **Cache cleanup.** `mapproxy_configuration/cleanup.yaml` removes tiles older
+  than 90 days from the online caches (OSM, OpenTopoMap, ZTM, cadastre,
+  contours, relief); the satellite (`gm_cache`) and orthophoto (`cuzk_cache`)
+  caches are kept. `scripts/cache_cleanup.sh` runs it in the container
+  (`--dry-run` / `--summary` pass through). Weekly via a systemd **user** timer
+  (no root, logged in the user journal, catches up after downtime):
+
+      ln -sf ~/catkin_ws/src/docker-mapproxy/scripts/systemd/mapproxy-cache-cleanup.{service,timer} ~/.config/systemd/user/
+      systemctl --user daemon-reload && systemctl --user enable --now mapproxy-cache-cleanup.timer
+      journalctl --user -u mapproxy-cache-cleanup   # what it removed
 
 ## Support
 

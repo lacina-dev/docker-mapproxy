@@ -1,0 +1,19 @@
+# Cache cleanup for the ONLINE map sources (run weekly by
+# scripts/cache_cleanup.sh via the systemd user timer
+# scripts/systemd/mapproxy-cache-cleanup.timer — see README "Cache cleanup").
+#
+# Tiles older than 90 days are removed and fetched again on the next view, so
+# the street/topo/cadastre layers follow their sources. NOT cleaned on
+# purpose: gm_cache (satellite) and cuzk_cache (CUZK orthophoto) — the
+# photographs change rarely and the robot needs them offline in the garden.
+# Check with:  scripts/cache_cleanup.sh --dry-run
+# (one task per grid: MapProxy cleans caches of one grid together)
+cleanups:
+  online_gm_grid_90d:
+    caches: [otm_cache, cuzk_ztm_cache, cuzk_kn_cache, cuzk_contours_cache, cuzk_hillshade_cache]
+    remove_before:
+      days: 90
+  osm_90d:
+    caches: [osm_cache]
+    remove_before:
+      days: 90

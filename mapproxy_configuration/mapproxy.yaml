@@ -29,6 +29,26 @@ layers:
   - name: cuzk_layer
     title: CUZK ortofoto CR (12.5 cm, free WMS, no key)
     sources: [ cuzk_cache ]
+  # ---- added 2026-11-08 (map sources for the robot UI) -------------------
+  # The UI lists these from ui_sources.json (same directory): keep the two in
+  # step ("layer" there = name here). All on gm_grid (EPSG:3857, origin ul,
+  # z0-z21): the UI fetches /wmts/<name>/gm_grid/{z}/{x}/{y}.<png|jpeg>.
+  - name: cuzk_ztm_layer
+    title: CUZK ZTM - Base topographic map of CR (open data, no key)
+    sources: [cuzk_ztm_cache]
+  - name: otm_layer
+    title: OpenTopoMap (CC-BY-SA, no key, max z17)
+    sources: [otm_cache]
+  # overlays (transparent PNG unless noted)
+  - name: cuzk_kn_layer
+    title: CUZK cadastre - parcels and boundaries, light lines (overlay)
+    sources: [cuzk_kn_cache]
+  - name: cuzk_contours_layer
+    title: CUZK ZABAGED contour lines (overlay)
+    sources: [cuzk_contours_cache]
+  - name: cuzk_hillshade_layer
+    title: CUZK DMR 5G shaded relief (overlay, opaque grey - use with opacity)
+    sources: [cuzk_hillshade_cache]
 
 
 caches:
@@ -50,6 +70,36 @@ caches:
     cache:
       type: file
       directory_layout: tms
+  cuzk_ztm_cache:
+    grids: [ gm_grid ]
+    sources: [ cuzk_ztm ]
+    format: image/jpeg
+    # the server has tiles up to z19 (404 above): finer levels are upscaled
+    upscale_tiles: 2
+    cache: {type: file, directory_layout: tms}
+  otm_cache:
+    grids: [ gm_grid ]
+    sources: [ otm ]
+    format: image/png
+    # OpenTopoMap ends at z17 (above it answers a blank placeholder that must
+    # never be cached): finer levels are upscaled from z17
+    upscale_tiles: 4
+    cache: {type: file, directory_layout: tms}
+  cuzk_kn_cache:
+    grids: [ gm_grid ]
+    sources: [ cuzk_kn ]
+    format: image/png
+    cache: {type: file, directory_layout: tms}
+  cuzk_contours_cache:
+    grids: [ gm_grid ]
+    sources: [ cuzk_contours ]
+    format: image/png
+    cache: {type: file, directory_layout: tms}
+  cuzk_hillshade_cache:
+    grids: [ gm_grid ]
+    sources: [ cuzk_hillshade ]
+    format: image/jpeg
+    cache: {type: file, directory_layout: tms}
 
 
 sources:
@@ -71,6 +121,52 @@ sources:
     req:
       url: https://ags.cuzk.cz/arcgis1/services/ORTOFOTO/MapServer/WMSServer
       layers: 0
+      transparent: false
+  # ---- added 2026-11-08 ---------------------------------------------------
+  # CUZK sources: (c) CUZK, open data, no key. OpenTopoMap: CC-BY-SA, no key,
+  # credit required. Tiles verified 2026-11-08 at the site (50.0187 N,
+  # 14.9033 E). Not added: Esri World Imagery (licence terms unclear for this
+  # use) and the CUZK orthophoto ARCHIVE WMS (answers non-browser clients with
+  # a redirect to its terms page).
+  cuzk_ztm:
+    # cached Web Mercator tiles of the CUZK ArcGIS server (ArcGIS order z/y/x)
+    type: tile
+    url: https://ags.cuzk.cz/arcgis1/rest/services/ZTM_WM/MapServer/tile/%(z)s/%(y)s/%(x)s
+    grid: gm_grid
+    # finest level the server has: z19 of gm_grid (0.2986 m/px)
+    max_res: 0.2985821417389697
+  otm:
+    type: tile
+    url: https://a.tile.opentopomap.org/%(z)s/%(x)s/%(y)s.png
+    grid: gm_grid
+    # finest real level: z17 of gm_grid (1.194 m/px)
+    max_res: 1.1943285668550503
+    http:
+      headers:
+        User-Agent: 'Vitulus-robot-MapProxy/1.16 (private garden robot)'
+  cuzk_kn:
+    # KN_I = the "inverse" cadastre: light lines meant for orthophoto and dark
+    # backgrounds. The server draws it from about z16 (scale limit).
+    type: wms
+    supported_srs: ['EPSG:3857']
+    req:
+      url: https://services.cuzk.cz/wms/wms.asp
+      layers: KN_I
+      transparent: true
+  cuzk_contours:
+    # drawn by the server from about z16 (scale limit)
+    type: wms
+    supported_srs: ['EPSG:3857']
+    req:
+      url: https://ags.cuzk.cz/arcgis/services/ZABAGED_VRSTEVNICE/MapServer/WMSServer
+      layers: '0'
+      transparent: true
+  cuzk_hillshade:
+    type: wms
+    supported_srs: ['EPSG:3857']
+    req:
+      url: https://ags.cuzk.cz/arcgis2/services/dmr5g/ImageServer/WMSServer
+      layers: 'dmr5g:GrayscaleHillshade'
       transparent: false
 
 
