@@ -2,19 +2,30 @@
 # scripts/cache_cleanup.sh via the systemd user timer
 # scripts/systemd/mapproxy-cache-cleanup.timer — see README "Cache cleanup").
 #
-# Tiles older than 90 days are removed and fetched again on the next view, so
-# the street/topo/cadastre layers follow their sources. NOT cleaned on
-# purpose: the photo caches (gm_cache, gm_hybrid_cache, esri_cache,
-# bing_cache, cuzk_wm_cache) — the photographs change rarely and the robot
-# needs them offline in the garden.
+# Old tiles are removed and fetched again on the next view, so the street,
+# topo and cadastre layers follow their sources:
+# - not seeded (OSM, OpenTopoMap, Google map): after 90 days;
+# - seeded for the garden by seed.yaml (task garden_cuzk: ZTM, cadastre,
+#   contours, relief, slope, buildings): after 52 weeks, the same age at
+#   which the seed refreshes them (refresh_before: weeks: 52). 90 days here
+#   deleted the offline overlays of the garden 9 months before the seed
+#   would have renewed them (T17 audit M4-3).
+# NOT cleaned on purpose: the photo caches (gm_cache, gm_hybrid_cache,
+# esri_cache, bing_cache, cuzk_wm_cache) — the photographs change rarely and
+# the robot needs them offline in the garden — and cuzk_cache (the pre-M1
+# orthophoto cache, read only, deleted by hand after a successful seed).
 # Check with:  scripts/cache_cleanup.sh --dry-run
-# (one task per grid: MapProxy cleans caches of one grid together)
+# (one task per grid and age: MapProxy cleans the caches of a task together)
 cleanups:
   online_gm_grid_90d:
-    caches: [otm_cache, cuzk_ztm_cache, cuzk_kn_cache, cuzk_contours_cache, cuzk_hillshade_cache,
-             cuzk_slope_cache, cuzk_ruian_cache, gm_map_cache]
+    caches: [otm_cache, gm_map_cache]
     remove_before:
       days: 90
+  seeded_gm_grid_52w:
+    caches: [cuzk_ztm_cache, cuzk_kn_cache, cuzk_contours_cache, cuzk_hillshade_cache,
+             cuzk_slope_cache, cuzk_ruian_cache]
+    remove_before:
+      weeks: 52
   osm_90d:
     caches: [osm_cache]
     remove_before:

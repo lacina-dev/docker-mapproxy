@@ -112,17 +112,63 @@ caches:
     disable_storage: true
     meta_size: [1, 1]
     meta_buffer: 0
-  # CUZK orthophoto from the server's pre-rendered Web Mercator tiles (same
-  # picture as the old WMS, alignment offset 'cuzk' still valid). New
-  # directory: the old WMS cache 'cuzk_cache_EPSG900913' is not read any more;
-  # the site is filled again by the open-data seed (seed.yaml, garden_cuzk)
-  # or on the first view.
+  # ---- CUZK orthophoto: tiles (batch M1) + offline fallback (batch M4) ----
+  # cuzk_wm_cache (layers cuzk_ortho_layer and, via cuzk_png_compat,
+  # cuzk_layer) merges its sources, bottom first:
+  #   cuzk_wm_coarse  coarser levels of cuzk_wm_cache itself, upscaled
+  #   cuzk_cache      the pre-M1 WMS cache (read only, upscaled too)
+  #   cuzk_wm         the CUZK tile server, z0-z20 (opaque JPEG)
+  #   cuzk            the CUZK WMS, z21 only (opaque JPEG)
+  # Online the server tile covers the fallbacks and is stored (decoded and
+  # re-encoded once when a fallback had something under it). Offline the
+  # server sources answer a transparent "nothing" that is never stored
+  # (their on_error), so the fallbacks show through: the old cache tile,
+  # else a coarser level. Where none has anything the tile is plain white
+  # (HTTP 200, not stored) instead of a 500.
+  # Why this shape (MapProxy 1.16, checked in its code and in a container):
+  # upscale_tiles runs only when a source has no tile for the level
+  # (max_res), never on a network error (that is a 500), and a cache with
+  # several sources never upscales at all: where every source has nothing it
+  # STORES a blank tile. Hence the WMS for z21 (as before batch M1) instead
+  # of the old "z21 = z20 upscaled": a z21 with nothing local would
+  # otherwise be stored white for good.
+  # Same directory as before (name + EPSG900913): tiles already stored stay
+  # valid. Filled on the first view or by the open-data seed (seed.yaml,
+  # garden_cuzk).
   cuzk_wm_cache:
     grids: [ gm_grid ]
-    sources: [ cuzk_wm ]
+    sources: [ cuzk_wm_coarse, cuzk_cache, cuzk_wm, cuzk ]
     format: image/jpeg
-    # the server has z0-z20 (404 above): z21 is upscaled from z20
-    upscale_tiles: 1
+    # required: a tile source cannot do meta tiles (and one WMS request per
+    # z21 tile, as the UI asks for single tiles)
+    meta_size: [1, 1]
+    meta_buffer: 0
+    cache: {type: file, directory_layout: tms}
+  # read-only view of cuzk_wm_cache's own directory (no source: never
+  # fetches, never stores): its coarser levels, up to 4 levels (16x) up
+  cuzk_wm_coarse:
+    grids: [ gm_grid ]
+    sources: []
+    format: image/jpeg
+    upscale_tiles: 4
+    cache:
+      type: file
+      directory_layout: tms
+      directory: ./cache_data/cuzk_wm_cache_EPSG900913
+      # NOT the store's lock directory: same directory = same lock file
+      # names, and the store holds a tile's lock while it reads this view
+      tile_lock_dir: ./cache_data/tile_locks_ro
+  # The pre-M1 cache of the CUZK orthophoto WMS (paletted PNG, z10-z21, 86 MB
+  # on the robot), READ ONLY: the old name gives the old directory
+  # (cache_data/cuzk_cache_EPSG900913). No source, so nothing is fetched or
+  # written into it (upscaled tiles are not stored; its tile locks go to
+  # cache_data/tile_locks). Up to 6 levels (64x) up. Once the directory is
+  # deleted (after a successful seed, see README) it simply finds nothing.
+  cuzk_cache:
+    grids: [ gm_grid ]
+    sources: []
+    format: image/png
+    upscale_tiles: 6
     cache: {type: file, directory_layout: tms}
   gm_hybrid_cache:
     grids: [ gm_grid ]
@@ -204,19 +250,33 @@ sources:
   osm_tiles:
     #the osm_tiles source refers to the openstreetmap.org tiles. These will be downloaded upon request (if not already cached) and served by MapProxy
     type: tile
-    url: http://tile.openstreetmap.org/%(tms_path)s.%(format)s
+    # https and an identifying User-Agent, as the OSM tile usage policy asks
+    # (plain http only got a redirect to https; batch M4, audit M4-6)
+    url: https://tile.openstreetmap.org/%(tms_path)s.%(format)s
     grid: webmercator
+    http:
+      headers:
+        User-Agent: 'Vitulus-robot-MapProxy/1.16 (private garden robot)'
   gm:
     type: tile
     url: http://mt0.google.com/vt/lyrs=s@0&hl=en&x=%(x)s&y=%(y)s&z=%(z)s
     grid: gm_grid
   cuzk:
-    # NOT USED since 2026-11-08 (cuzk_wm, the server's ready tiles, replaced
-    # it); kept for a quick rollback. CUZK ortofoto CR — official Czech
-    # orthophoto, ~12.5 cm, refreshed on a 2-year cycle, free WMS without an
-    # API key. Verified 2026-08-01: serves EPSG:3857 directly.
+    # CUZK ortofoto CR — official Czech orthophoto, ~12.5 cm, refreshed on a
+    # 2-year cycle, free WMS without an API key. Verified 2026-08-01: serves
+    # EPSG:3857 directly. Since batch M1 the tiles come from cuzk_wm; batch
+    # M4 uses this WMS again for z21 ONLY (in cuzk_wm_cache, see there): the
+    # z21 picture the robot had before M1. Only legacy cuzk_layer clients
+    # ask for z21 (the UI catalog stops the orthophoto at z20).
+    # For a rollback to the WMS remove min_res.
     type: wms
     supported_srs: ['EPSG:3857']
+    # z21 only (0.0746 m/px); z20 (0.149 m/px) and coarser come from cuzk_wm
+    min_res: 0.1
+    on_error:
+      other:
+        response: transparent
+        cache: false
     req:
       url: https://ags.cuzk.cz/arcgis1/services/ORTOFOTO/MapServer/WMSServer
       layers: 0
@@ -272,11 +332,14 @@ sources:
       layers: 'dmr5g:GrayscaleHillshade'
       transparent: false
   # ---- added 2026-11-08, batch M1 ------------------------------------------
-  # concurrent_requests: at most N parallel requests to that server PER
-  # MapProxy process. The robot runs 16-20 uWSGI processes (CHEAPER=16 kept,
-  # PROCESSES=20 max), so the real ceiling is N x 16-20: N = 1 everywhere
-  # (tile servers: one tile = one fast GET; WMS: each request renders a 4x4
-  # meta tile on the CUZK server). 4 would allow up to 80 at once.
+  # concurrent_requests (corrected in batch M4 from the MapProxy 1.16 code,
+  # mapproxy/config/loader.py): only WMS sources use it, as a file semaphore
+  # in cache_data/locks keyed by the server's HOST NAME, so it holds across
+  # all uWSGI processes and is SHARED by every WMS source on that host
+  # (here cuzk_slope + cuzk_ruian share one slot; contours, relief, cuzk z21
+  # and the tile sources on that host are not limited by it). The lock waits
+  # up to http.client_timeout (60 s) — slow RÚIAN meta tiles can queue past
+  # it. Tile sources (type: tile) accept the key and ignore it.
   gm_hybrid:
     type: tile
     url: https://mt0.google.com/vt/lyrs=y&hl=en&x=%(x)s&y=%(y)s&z=%(z)s
@@ -316,6 +379,13 @@ sources:
     # below the level value (see cuzk_ztm)
     max_res: 0.12
     concurrent_requests: 1
+    # batch M4: any failure (no network, DNS, timeout, HTTP error) gives a
+    # transparent tile that is NOT cached, so the offline fallbacks of
+    # cuzk_wm_cache show through instead of a 500 (see cuzk_wm_cache)
+    on_error:
+      other:
+        response: transparent
+        cache: false
   cuzk_slope:
     # DMR 5G terrain slope, colour (yellow-orange-red = steeper), 2 m pixels
     type: wms

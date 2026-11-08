@@ -39,7 +39,11 @@ seeds:
   # commercial photo bases (Google, Esri, Bing): their terms do not allow
   # caching; seeding them is the owner's call (decision D40) — run this task
   # only when asked. Levels stop at each source's real level (the caches
-  # upscale beyond it).
+  # upscale beyond it). Open proposal for the owner (T17 audit M4-2): the
+  # UI's default base is Google satellite (gm_cache), but the default seed
+  # is garden_cuzk only, so offline the default base has only what was
+  # viewed before; adding garden_photo_google to the default tasks of
+  # seed_garden.sh would fill it. Not done without the owner's yes.
   garden_photo_google:
     caches: [gm_cache, gm_hybrid_cache]
     coverages: [garden]
